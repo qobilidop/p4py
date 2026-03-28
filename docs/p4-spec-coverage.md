@@ -9,17 +9,17 @@ supported constructs to their spec sections.
 
 ## Types
 
-| Construct     | Supported | Spec section                | Notes                            |
-| ------------- | --------- | --------------------------- | -------------------------------- |
-| `bit<W>`      | Yes       | [§7.1 Base types][bit]      | Only numeric type                |
-| `int<W>`      | No        | [§7.1 Base types][bit]      |                                  |
-| `varbit`      | No        | [§7.1 Base types][bit]      |                                  |
-| `bool`        | No        | [§7.1 Base types][bit]      |                                  |
-| `header`      | Yes       | [§7.2 Header types][header] | Flat only, all fields `bit<W>`   |
-| Header stacks | No        | [§7.2 Header types][header] |                                  |
-| `struct`      | Yes       | [§7.2 Header types][struct] | Members must be header instances |
-| `enum`        | No        | [§7.3 Other types][bit]     |                                  |
-| `typedef`     | No        | [§7.3 Other types][bit]     |                                  |
+| Construct     | Supported | Spec section                | Notes                          |
+| ------------- | --------- | --------------------------- | ------------------------------ |
+| `bit<W>`      | Yes       | [§7.1 Base types][bit]      | Only numeric type              |
+| `int<W>`      | No        | [§7.1 Base types][bit]      |                                |
+| `varbit`      | No        | [§7.1 Base types][bit]      |                                |
+| `bool`        | No        | [§7.1 Base types][bit]      |                                |
+| `header`      | Yes       | [§7.2 Header types][header] | Flat only, all fields `bit<W>` |
+| Header stacks | No        | [§7.2 Header types][header] |                                |
+| `struct`      | Yes       | [§7.2 Header types][struct] | Header and `bit<W>` members    |
+| `enum`        | No        | [§7.3 Other types][bit]     |                                |
+| `typedef`     | No        | [§7.3 Other types][bit]     |                                |
 
 [bit]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-bit-ops
 [header]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-header-types
@@ -71,7 +71,7 @@ supported constructs to their spec sections.
 | Method call      | Yes       | [§12 Statements][stmts] | `extract`, `emit`              |
 | Function call    | Yes       | [§12 Statements][stmts] | `mark_to_drop`                 |
 | `if`/`else`      | Yes       | [§12 Statements][stmts] | Condition must be `.isValid()` |
-| `switch`         | No        | [§12 Statements][stmts] |                                |
+| `switch`         | Yes       | [§12 Statements][stmts] | On `action_run` only           |
 | Block statements | No        | [§12 Statements][stmts] |                                |
 
 [stmts]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-stmts
