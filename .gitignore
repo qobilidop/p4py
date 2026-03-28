@@ -25,6 +25,9 @@ dist/
 # Superpowers
 /docs/superpowers/
 
+# Worktrees
+/.worktrees/
+
 # IDE
 .idea/
 .vscode/
