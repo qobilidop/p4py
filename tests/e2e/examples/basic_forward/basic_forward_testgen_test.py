@@ -12,7 +12,7 @@ import tempfile
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
 from p4py.sim import simulate
-from tests.e2e.basic_forward.basic_forward import main
+from tests.e2e.examples.basic_forward.basic_forward import main
 from tests.infra.stf_runner import (
     match_hex,
     run_stf_test,
