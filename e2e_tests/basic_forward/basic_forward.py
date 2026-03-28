@@ -5,23 +5,20 @@ exact-match table, and forwards to the specified port.
 """
 
 import p4py.lang as p4
-from p4py.arch.v1model import V1SwitchMini, mark_to_drop
-from p4py.lang.bit import bit
-from p4py.lang.header import header
-from p4py.lang.struct import struct
+from p4py.arch import v1model
 
 
-class ethernet_t(header):
-    dstAddr: bit(48)
-    srcAddr: bit(48)
-    etherType: bit(16)
+class ethernet_t(p4.header):
+    dstAddr: p4.bit(48)
+    srcAddr: p4.bit(48)
+    etherType: p4.bit(16)
 
 
-class headers_t(struct):
+class headers_t(p4.struct):
     ethernet: ethernet_t
 
 
-class metadata_t(struct):
+class metadata_t(p4.struct):
     pass
 
 
@@ -40,7 +37,7 @@ def MyIngress(hdr, meta, std_meta):
 
     @p4.action
     def drop():
-        mark_to_drop(std_meta)
+        v1model.mark_to_drop(std_meta)
 
     mac_table = p4.table(
         key={hdr.ethernet.dstAddr: p4.exact},
@@ -56,7 +53,7 @@ def MyDeparser(pkt, hdr):
     pkt.emit(hdr.ethernet)
 
 
-main = V1SwitchMini(
+main = v1model.V1SwitchMini(
     parser=MyParser,
     ingress=MyIngress,
     deparser=MyDeparser,

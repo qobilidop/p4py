@@ -202,6 +202,30 @@ class TestCompileControl:
         assert isinstance(if_else.else_body[0], nodes.FunctionCall)
 
 
+    def test_module_qualified_extern(self):
+        """v1model.mark_to_drop(std_meta) compiles to FunctionCall."""
+        from p4py.arch import v1model
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            @p4.action
+            def drop():
+                v1model.mark_to_drop(std_meta)
+
+            drop()
+
+        pipeline = V1SwitchMini(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        program = compile(pipeline)
+
+        drop_action = program.ingress.actions[0]
+        assert isinstance(drop_action.body[0], nodes.FunctionCall)
+        assert drop_action.body[0].name == "mark_to_drop"
+
+
 class TestCompileDeparser:
     def test_emit_order(self):
         @p4.deparser

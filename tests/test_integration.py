@@ -5,44 +5,41 @@ emits P4-16 source, and simulates packet processing.
 """
 
 import p4py.lang as p4
-from p4py.arch.v1model import V1SwitchMini, mark_to_drop
+from p4py.arch import v1model
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
-from p4py.lang.bit import bit
-from p4py.lang.header import header
-from p4py.lang.struct import struct
 from p4py.sim import simulate
 
 # --- Type definitions ---
 
 
-class ethernet_t(header):
-    dstAddr: bit(48)
-    srcAddr: bit(48)
-    etherType: bit(16)
+class ethernet_t(p4.header):
+    dstAddr: p4.bit(48)
+    srcAddr: p4.bit(48)
+    etherType: p4.bit(16)
 
 
-class ipv4_t(header):
-    version: bit(4)
-    ihl: bit(4)
-    diffserv: bit(8)
-    totalLen: bit(16)
-    identification: bit(16)
-    flags: bit(3)
-    fragOffset: bit(13)
-    ttl: bit(8)
-    protocol: bit(8)
-    hdrChecksum: bit(16)
-    srcAddr: bit(32)
-    dstAddr: bit(32)
+class ipv4_t(p4.header):
+    version: p4.bit(4)
+    ihl: p4.bit(4)
+    diffserv: p4.bit(8)
+    totalLen: p4.bit(16)
+    identification: p4.bit(16)
+    flags: p4.bit(3)
+    fragOffset: p4.bit(13)
+    ttl: p4.bit(8)
+    protocol: p4.bit(8)
+    hdrChecksum: p4.bit(16)
+    srcAddr: p4.bit(32)
+    dstAddr: p4.bit(32)
 
 
-class headers_t(struct):
+class headers_t(p4.struct):
     ethernet: ethernet_t
     ipv4: ipv4_t
 
 
-class metadata_t(struct):
+class metadata_t(p4.struct):
     pass
 
 
@@ -73,7 +70,7 @@ def MyIngress(hdr, meta, std_meta):
 
     @p4.action
     def drop():
-        mark_to_drop(std_meta)
+        v1model.mark_to_drop(std_meta)
 
     ipv4_table = p4.table(
         key={hdr.ipv4.dstAddr: p4.exact},
@@ -93,7 +90,7 @@ def MyDeparser(pkt, hdr):
     pkt.emit(hdr.ipv4)
 
 
-main = V1SwitchMini(
+main = v1model.V1SwitchMini(
     parser=MyParser,
     ingress=MyIngress,
     deparser=MyDeparser,

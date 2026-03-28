@@ -105,7 +105,7 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
     raise ValueError(f"Unsupported expression: {ast.dump(node)}")
 
 
-def _ast_to_statement(node: ast.stmt) -> nodes.Statement:
+def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
     """Convert an AST statement to an IR Statement."""
     # Assignment: target = value
     if isinstance(node, ast.Assign) and len(node.targets) == 1:
@@ -115,15 +115,15 @@ def _ast_to_statement(node: ast.stmt) -> nodes.Statement:
 
     # Expression statement (method call, function call, etc.)
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-        return _ast_call_to_statement(node.value)
+        return _ast_call_to_statement(node.value, params)
 
     # If/else
     if isinstance(node, ast.If):
         condition = _ast_to_expression(node.test)
         if not isinstance(condition, nodes.IsValid):
             raise ValueError("if conditions must be hdr.x.isValid()")
-        then_body = tuple(_ast_to_statement(s) for s in node.body)
-        else_body = tuple(_ast_to_statement(s) for s in node.orelse)
+        then_body = tuple(_ast_to_statement(s, params) for s in node.body)
+        else_body = tuple(_ast_to_statement(s, params) for s in node.orelse)
         return nodes.IfElse(
             condition=condition, then_body=then_body, else_body=else_body
         )
@@ -131,7 +131,7 @@ def _ast_to_statement(node: ast.stmt) -> nodes.Statement:
     raise ValueError(f"Unsupported statement: {ast.dump(node)}")
 
 
-def _ast_call_to_statement(call: ast.Call) -> nodes.Statement:
+def _ast_call_to_statement(call: ast.Call, params: set[str]) -> nodes.Statement:
     """Convert an AST Call to a Statement (MethodCall, FunctionCall, etc.)."""
     # obj.method(args) — e.g., pkt.extract(hdr.ethernet)
     if isinstance(call.func, ast.Attribute):
@@ -139,6 +139,15 @@ def _ast_call_to_statement(call: ast.Call) -> nodes.Statement:
         # table.apply()
         if attr.attr == "apply" and isinstance(attr.value, ast.Name):
             return nodes.TableApply(table_name=attr.value.id)
+        # Module-qualified function: name.func(args) where name is not a
+        # block parameter (e.g. v1model.mark_to_drop).  Strip the module
+        # prefix and emit a plain FunctionCall.
+        if (
+            isinstance(attr.value, ast.Name)
+            and attr.value.id not in params
+        ):
+            args = tuple(_ast_to_expression(a) for a in call.args)
+            return nodes.FunctionCall(name=attr.attr, args=args)
         obj = _ast_to_field_access(attr.value)
         args = tuple(_ast_to_expression(a) for a in call.args)
         return nodes.MethodCall(object=obj, method=attr.attr, args=args)
@@ -154,17 +163,23 @@ def _ast_call_to_statement(call: ast.Call) -> nodes.Statement:
 # --- Parser compilation ---
 
 
+def _param_names(func_def: ast.FunctionDef) -> set[str]:
+    """Extract parameter names from a FunctionDef."""
+    return {arg.arg for arg in func_def.args.args}
+
+
 def _compile_parser(spec) -> nodes.ParserDecl:
     """Compile a @p4.parser spec into a ParserDecl."""
     func_def = _parse_spec_ast(spec)
+    params = _param_names(func_def)
     states = []
     for node in func_def.body:
         if isinstance(node, ast.FunctionDef):
-            states.append(_compile_parser_state(node))
+            states.append(_compile_parser_state(node, params))
     return nodes.ParserDecl(name=spec._p4_name, states=tuple(states))
 
 
-def _compile_parser_state(func_def: ast.FunctionDef) -> nodes.ParserState:
+def _compile_parser_state(func_def: ast.FunctionDef, params: set[str]) -> nodes.ParserState:
     """Compile a nested function into a ParserState."""
     body_stmts: list[nodes.Statement] = []
     transition: nodes.Transition | nodes.TransitionSelect | None = None
@@ -178,7 +193,7 @@ def _compile_parser_state(func_def: ast.FunctionDef) -> nodes.ParserState:
             transition = _compile_transition_select(node)
         # Other statements (extract, etc.)
         else:
-            body_stmts.append(_ast_to_statement(node))
+            body_stmts.append(_ast_to_statement(node, params))
 
     if transition is None:
         raise ValueError(
@@ -237,6 +252,7 @@ def _compile_transition_select(match: ast.Match) -> nodes.TransitionSelect:
 def _compile_control(spec) -> nodes.ControlDecl:
     """Compile a @p4.control spec into a ControlDecl."""
     func_def = _parse_spec_ast(spec)
+    params = _param_names(func_def)
 
     actions: list[nodes.ActionDecl] = []
     tables: list[nodes.TableDecl] = []
@@ -245,7 +261,7 @@ def _compile_control(spec) -> nodes.ControlDecl:
     for node in func_def.body:
         # @p4.action decorated function → ActionDecl
         if isinstance(node, ast.FunctionDef) and _has_p4_decorator(node, "action"):
-            actions.append(_compile_action(node))
+            actions.append(_compile_action(node, params))
         # name = p4.table(...) → TableDecl
         elif isinstance(node, ast.Assign) and _is_table_call(node):
             tables.append(_compile_table(node))
@@ -254,7 +270,7 @@ def _compile_control(spec) -> nodes.ControlDecl:
             continue
         # Everything else → apply body
         else:
-            apply_body.append(_ast_to_statement(node))
+            apply_body.append(_ast_to_statement(node, params))
 
     return nodes.ControlDecl(
         name=spec._p4_name,
@@ -272,9 +288,11 @@ def _has_p4_decorator(node: ast.FunctionDef, name: str) -> bool:
     return False
 
 
-def _compile_action(func_def: ast.FunctionDef) -> nodes.ActionDecl:
+def _compile_action(
+    func_def: ast.FunctionDef, block_params: set[str]
+) -> nodes.ActionDecl:
     """Compile a @p4.action function into an ActionDecl."""
-    params = []
+    action_params = []
     for arg in func_def.args.args:
         if arg.annotation is not None:
             # p4.bit(W) → BitType
@@ -284,7 +302,7 @@ def _compile_action(func_def: ast.FunctionDef) -> nodes.ActionDecl:
                 and arg.annotation.func.attr == "bit"
             ):
                 width = arg.annotation.args[0].value
-                params.append(
+                action_params.append(
                     nodes.ActionParam(name=arg.arg, type=nodes.BitType(width))
                 )
             else:
@@ -292,8 +310,8 @@ def _compile_action(func_def: ast.FunctionDef) -> nodes.ActionDecl:
                     f"Action param '{arg.arg}' must be annotated with p4.bit(W)"
                 )
 
-    body = tuple(_ast_to_statement(node) for node in func_def.body)
-    return nodes.ActionDecl(name=func_def.name, params=tuple(params), body=body)
+    body = tuple(_ast_to_statement(node, block_params) for node in func_def.body)
+    return nodes.ActionDecl(name=func_def.name, params=tuple(action_params), body=body)
 
 
 def _is_table_call(node: ast.Assign) -> bool:
