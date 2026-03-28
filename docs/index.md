@@ -15,7 +15,8 @@ import p4py
 ```{toctree}
 :maxdepth: 2
 
-roadmap
+p4-spec-coverage
+v1model-coverage
 architecture
 dev/guide
 ```
