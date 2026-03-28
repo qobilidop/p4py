@@ -53,7 +53,7 @@ def MyDeparser(pkt, hdr):
     pkt.emit(hdr.ethernet)
 
 
-main = v1model.V1SwitchMini(
+main = v1model.V1Switch(
     parser=MyParser,
     ingress=MyIngress,
     deparser=MyDeparser,

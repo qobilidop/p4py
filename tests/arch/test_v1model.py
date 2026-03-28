@@ -1,7 +1,7 @@
 """Tests for p4py.arch.v1model and language surface."""
 
 import p4py.lang as p4
-from p4py.arch.v1model import V1SwitchMini, mark_to_drop, standard_metadata_t
+from p4py.arch.v1model import V1Switch, mark_to_drop, standard_metadata_t
 from p4py.lang.bit import bit
 from p4py.lang.header import header
 from p4py.lang.struct import struct
@@ -74,7 +74,7 @@ class TestMarkToDrop:
         assert mark_to_drop._p4_name == "mark_to_drop"
 
 
-class TestV1SwitchMini:
+class TestV1Switch:
     def test_creates_pipeline(self):
         class eth_t(header):
             x: bit(8)
@@ -98,7 +98,7 @@ class TestV1SwitchMini:
         def D(pkt, hdr):
             pass
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=P,
             ingress=I,
             deparser=D,
@@ -108,3 +108,7 @@ class TestV1SwitchMini:
         assert pipeline.deparser._p4_name == "D"
         assert pipeline.headers is hdrs_t
         assert pipeline.metadata is meta_t
+        # Optional blocks default to None.
+        assert pipeline.verify_checksum is None
+        assert pipeline.egress is None
+        assert pipeline.compute_checksum is None

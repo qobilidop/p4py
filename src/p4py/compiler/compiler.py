@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import ast
 
-from p4py.arch.v1model import V1SwitchMini
+from p4py.arch.v1model import V1Switch
 from p4py.ir import nodes
 
 
-def compile(pipeline: V1SwitchMini) -> nodes.Program:
-    """Compile a V1SwitchMini pipeline into an IR Program."""
+def compile(pipeline: V1Switch) -> nodes.Program:
+    """Compile a V1Switch pipeline into an IR Program."""
     headers_ir = _compile_types(pipeline.headers)
     structs_ir = _compile_structs(pipeline.headers, pipeline.metadata)
     parser_ir = _compile_parser(pipeline.parser)

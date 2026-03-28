@@ -1,7 +1,7 @@
 """Tests for the P4Mini compiler."""
 
 import p4py.lang as p4
-from p4py.arch.v1model import V1SwitchMini, mark_to_drop
+from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.compiler import compile
 from p4py.ir import nodes
 from p4py.lang.bit import bit
@@ -73,7 +73,7 @@ class TestCompileParser:
                 pkt.extract(hdr.ethernet)
                 return p4.ACCEPT
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=MyParser,
             ingress=_dummy_ingress(),
             deparser=_dummy_deparser(),
@@ -107,7 +107,7 @@ class TestCompileParser:
                 pkt.extract(hdr.ipv4)
                 return p4.ACCEPT
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=MyParser,
             ingress=_dummy_ingress(),
             deparser=_dummy_deparser(),
@@ -158,7 +158,7 @@ class TestCompileControl:
             else:
                 drop()
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=_dummy_parser(),
             ingress=MyIngress,
             deparser=_dummy_deparser(),
@@ -214,7 +214,7 @@ class TestCompileControl:
 
             drop()
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=_dummy_parser(),
             ingress=MyIngress,
             deparser=_dummy_deparser(),
@@ -233,7 +233,7 @@ class TestCompileDeparser:
             pkt.emit(hdr.ethernet)
             pkt.emit(hdr.ipv4)
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=_dummy_parser(),
             ingress=_dummy_ingress(),
             deparser=MyDeparser,
@@ -262,7 +262,7 @@ class TestCompileProgram:
         def D(pkt, hdr):
             pass
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=P,
             ingress=I,
             deparser=D,

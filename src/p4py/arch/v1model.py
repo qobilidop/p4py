@@ -1,7 +1,7 @@
 """v1model architecture for P4Mini.
 
 Defines the minimal v1model subset: standard_metadata_t, mark_to_drop,
-and V1SwitchMini pipeline.
+and V1Switch pipeline.
 """
 
 from dataclasses import dataclass
@@ -35,22 +35,29 @@ mark_to_drop = _Extern("mark_to_drop")
 
 
 @dataclass
-class V1SwitchMini:
-    """Simplified v1model pipeline: Parser, Ingress, Deparser.
+class V1Switch:
+    """v1model pipeline with field order matching v1model.p4.
 
     Header and metadata types are inferred from the parser's type
     annotations (``hdr`` and ``meta`` parameters), matching how the
     real v1model architecture works.
 
-    The P4-16 emitter expands this to the full V1Switch with empty
-    VerifyChecksum, Egress, and ComputeChecksum blocks.
+    Optional blocks (verify_checksum, egress, compute_checksum) default
+    to None; the P4-16 emitter produces empty apply blocks for them.
     """
 
     parser: "_Spec"
-    ingress: "_Spec"
-    deparser: "_Spec"
+    verify_checksum: "_Spec | None" = None
+    ingress: "_Spec | None" = None
+    egress: "_Spec | None" = None
+    compute_checksum: "_Spec | None" = None
+    deparser: "_Spec | None" = None
 
     def __post_init__(self) -> None:
+        if self.ingress is None:
+            raise TypeError("V1Switch requires ingress")
+        if self.deparser is None:
+            raise TypeError("V1Switch requires deparser")
         annotations = self.parser._p4_annotations
         self.headers: type[struct_cls] = annotations["hdr"]
         self.metadata: type[struct_cls] = annotations["meta"]

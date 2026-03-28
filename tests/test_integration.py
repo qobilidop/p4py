@@ -90,7 +90,7 @@ def MyDeparser(pkt, hdr):
     pkt.emit(hdr.ipv4)
 
 
-main = v1model.V1SwitchMini(
+main = v1model.V1Switch(
     parser=MyParser,
     ingress=MyIngress,
     deparser=MyDeparser,

@@ -1,7 +1,7 @@
 """Tests for the P4-16 backend."""
 
 import p4py.lang as p4
-from p4py.arch.v1model import V1SwitchMini, mark_to_drop
+from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
 from p4py.lang.bit import bit
@@ -82,7 +82,7 @@ class TestEmit:
             pkt.emit(hdr.ethernet)
             pkt.emit(hdr.ipv4)
 
-        pipeline = V1SwitchMini(
+        pipeline = V1Switch(
             parser=MyParser,
             ingress=MyIngress,
             deparser=MyDeparser,
