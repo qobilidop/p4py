@@ -1,0 +1,7 @@
+load("//e2e_tests:stf_test.bzl", "stf_test")
+
+stf_test(
+    name = "basic_forward_test",
+    p4_program = "basic_forward.p4",
+    stf_file = "basic_forward.stf",
+)
