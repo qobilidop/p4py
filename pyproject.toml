@@ -40,3 +40,4 @@ select = [
 "src/p4py/arch/v1model.py" = ["N801"]
 "tests/lang/*" = ["N801", "N815"]
 "tests/arch/*" = ["N801", "N802", "E743"]
+"tests/compiler/*" = ["N801", "N802", "N815", "E743"]
