@@ -318,6 +318,7 @@ def _set_field(state: _SimState, fa: nodes.FieldAccess, value: int) -> None:
 def _run_deparser(state: _SimState, deparser: nodes.DeparserDecl) -> bytearray:
     """Deparse headers back to bytes, followed by remaining payload."""
     output = bytearray()
+    bit_offset = 0
     for field_ref in deparser.emit_order:
         header_name = field_ref.path[-1]
         hdr = state.headers[header_name]
@@ -326,21 +327,13 @@ def _run_deparser(state: _SimState, deparser: nodes.DeparserDecl) -> bytearray:
         for field_info in hdr.type_info.fields:
             width = field_info.type.width
             value = hdr.fields[field_info.name]
-            # Append bits, padded to byte boundary per header.
-            _append_bits(output, width, value)
+            needed_bytes = (bit_offset + width + 7) // 8
+            while len(output) < needed_bytes:
+                output.append(0)
+            _write_bits(output, bit_offset, width, value)
+            bit_offset += width
 
     # Append remaining payload (bytes after parsed headers).
     payload_start = state.cursor // 8
     output.extend(state.packet_bytes[payload_start:])
     return output
-
-
-def _append_bits(output: bytearray, width: int, value: int) -> None:
-    """Append `width` bits of `value` to the output buffer."""
-    # For simplicity, accumulate into existing output byte-by-byte.
-    bit_offset = len(output) * 8
-    # Extend output to have enough bytes.
-    needed_bytes = (bit_offset + width + 7) // 8
-    while len(output) < needed_bytes:
-        output.append(0)
-    _write_bits(output, bit_offset, width, value)
