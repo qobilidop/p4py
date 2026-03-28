@@ -37,4 +37,6 @@ select = [
 # P4 eDSL uses lowercase class names (header, struct) and P4-style field names.
 "src/p4py/lang/header.py" = ["N801"]
 "src/p4py/lang/struct.py" = ["N801"]
+"src/p4py/arch/v1model.py" = ["N801"]
 "tests/lang/*" = ["N801", "N815"]
+"tests/arch/*" = ["N801", "N802", "E743"]
