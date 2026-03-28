@@ -11,8 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     iproute2 \
     python3 \
-    python3-pip \
-    python3-venv \
     shellcheck \
     software-properties-common \
     sudo \
@@ -62,15 +60,6 @@ RUN DPRINT_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64"
 # Install uv (Python package manager).
 RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
-# Install Python packages.
-RUN pip install \
-    furo \
-    myst-parser \
-    sphinx \
-    sphinx-autobuild \
-    pytest \
-    ruff
-
 # Create non-root user. Bazel discourages running as root.
 # Grant passwordless sudo for network setup (veth pairs for BMv2 testing).
 RUN useradd -m dev && \
@@ -82,3 +71,9 @@ RUN useradd -m dev && \
 RUN git config --system --add safe.directory /workspace
 
 USER dev
+ENV PATH="/home/dev/.local/bin:${PATH}"
+
+# Install Python tools via uv.
+RUN uv tool install ruff && \
+    uv tool install sphinx --with furo --with myst-parser && \
+    uv tool install sphinx-autobuild --with furo --with myst-parser

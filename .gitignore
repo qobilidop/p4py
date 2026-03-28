@@ -8,6 +8,8 @@ MODULE.bazel.lock
 
 # Python
 __pycache__/
+.venv/
+uv.lock
 *.py[cod]
 *.egg-info/
 dist/
