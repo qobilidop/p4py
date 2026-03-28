@@ -25,6 +25,7 @@ __all__ = [
     "ACCEPT",
     "REJECT",
     "BitType",
+    "_Spec",
     "action",
     "bit",
     "control",
