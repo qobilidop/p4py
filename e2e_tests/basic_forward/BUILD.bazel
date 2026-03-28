@@ -29,3 +29,19 @@ py_test(
         "//src/p4py",
     ],
 )
+
+py_test(
+    name = "basic_forward_testgen_test",
+    timeout = "moderate",
+    srcs = ["basic_forward_testgen_test.py"],
+    local = True,
+    tags = [
+        "e2e",
+        "local",
+    ],
+    deps = [
+        ":basic_forward",
+        "//e2e_tests:stf_runner",
+        "//src/p4py",
+    ],
+)

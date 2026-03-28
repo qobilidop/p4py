@@ -108,7 +108,11 @@ def stf_to_sim_inputs(stf_text: str) -> SimInputs:
         elif cmd == "expect":
             parts = args.split(None, 1)
             port = int(parts[0])
-            pattern = parts[1].replace(" ", "") if len(parts) > 1 else None
+            pattern = (
+                parts[1].replace(" ", "").rstrip("$").lower()
+                if len(parts) > 1
+                else None
+            )
             expects.append(SimExpect(port=port, pattern=pattern))
 
     return SimInputs(
@@ -367,7 +371,11 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
         elif cmd == "expect":
             parts = args.split(None, 1)
             port = int(parts[0])
-            hex_pattern = parts[1].replace(" ", "") if len(parts) > 1 else None
+            hex_pattern = (
+                parts[1].replace(" ", "").rstrip("$")
+                if len(parts) > 1
+                else None
+            )
             ports.add(port)
             expect_packets.append((port, hex_pattern))
         elif cmd in ("add", "setdefault"):

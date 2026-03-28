@@ -133,3 +133,14 @@ class TestStfToSimInputs:
         assert len(result.expects) == 2
         assert result.packets[0].port == 0
         assert result.packets[1].port == 1
+
+    def test_expect_end_of_packet_marker(self):
+        stf = "packet 0 AABB\n" "expect 1 AABB$\n"
+        result = stf_to_sim_inputs(stf)
+        assert result.expects[0].pattern == "aabb"
+
+    def test_drop_test_no_expect(self):
+        stf = "add T A()\n" "packet 0 AABB\n"
+        result = stf_to_sim_inputs(stf)
+        assert len(result.packets) == 1
+        assert len(result.expects) == 0
