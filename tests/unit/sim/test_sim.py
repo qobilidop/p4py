@@ -36,6 +36,50 @@ class metadata_t(p4.struct):
     pass
 
 
+def _make_passthrough():
+    """A pipeline that parses ethernet+ipv4 but doesn't drop anything."""
+
+    @p4.parser
+    def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
+        def start():
+            pkt.extract(hdr.ethernet)
+            match hdr.ethernet.etherType:
+                case 0x0800:
+                    return parse_ipv4
+                case _:
+                    return p4.ACCEPT
+
+        def parse_ipv4():
+            pkt.extract(hdr.ipv4)
+            return p4.ACCEPT
+
+    @p4.control
+    def MyIngress(hdr, meta, std_meta):
+        @p4.action
+        def nop():
+            pass
+
+        t = p4.table(
+            key={hdr.ethernet.dstAddr: p4.exact},
+            actions=[nop],
+            default_action=nop,
+        )
+
+        t.apply()
+
+    @p4.deparser
+    def MyDeparser(pkt, hdr):
+        pkt.emit(hdr.ethernet)
+        pkt.emit(hdr.ipv4)
+
+    pipeline = V1Switch(
+        parser=MyParser,
+        ingress=MyIngress,
+        deparser=MyDeparser,
+    )
+    return compile(pipeline)
+
+
 def _make_ipv4_forwarder():
     @p4.parser
     def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
@@ -418,6 +462,28 @@ class TestSimulator:
         )
         assert not result.dropped
         assert result.egress_port == 5
+
+    def test_extract_fails_on_short_packet(self):
+        """Extract fails when packet is too short for the header."""
+        # 14-byte ethernet with etherType=0x0800, then only 6 bytes of payload
+        # (not enough for 20-byte IPv4 header).
+        short_packet = (
+            b"\x00\x00\x00\x00\x00\x01"  # dstAddr
+            b"\x00\x00\x00\x00\x00\x02"  # srcAddr
+            b"\x08\x00"  # etherType = IPv4
+            b"\x00\x00\x00\x00\x00\x00"  # 6 bytes payload (< 20 needed)
+        )
+        program = _make_passthrough()
+        result = simulate(
+            program,
+            packet=short_packet,
+            ingress_port=0,
+            table_entries={},
+        )
+        # IPv4 extract should fail, so isValid() is false → deparser skips
+        # emitting ipv4. Output should be same length as input.
+        assert not result.dropped
+        assert len(result.packet) == len(short_packet)
 
     def test_drop_non_ipv4(self):
         # Non-IPv4 packet (etherType=0x0806 ARP).

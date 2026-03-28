@@ -305,8 +305,15 @@ def _exec_extract(state: _SimState, header_ref: nodes.Expression) -> None:
     # header_ref.path is like ("hdr", "ethernet")
     header_name = header_ref.path[-1]
     hdr = state.headers[header_name]
-    hdr.valid = True
 
+    # Check if enough bits remain in the packet for this header.
+    total_bits = sum(f.type.width for f in hdr.type_info.fields)
+    available_bits = (len(state.packet_bytes) * 8) - state.cursor
+    if available_bits < total_bits:
+        # Not enough data — header stays invalid (extract fails).
+        return
+
+    hdr.valid = True
     bit_offset = 0
     for field_info in hdr.type_info.fields:
         width = field_info.type.width
@@ -381,7 +388,7 @@ def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int])
         return state.metadata[path[1]]
     # hdr.header.field
     if path[0] == "hdr" and len(path) == 3:
-        return state.headers[path[1]].fields[path[2]]
+        return state.headers[path[1]].fields.get(path[2], 0)
     raise ValueError(f"Cannot read field: {'.'.join(path)}")
 
 
