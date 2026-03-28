@@ -198,7 +198,6 @@ class TestCompileControl:
         assert isinstance(if_else.then_body[0], nodes.TableApply)
         assert isinstance(if_else.else_body[0], nodes.FunctionCall)
 
-
     def test_module_qualified_extern(self):
         """v1model.mark_to_drop(std_meta) compiles to FunctionCall."""
         from p4py.arch import v1model

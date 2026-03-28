@@ -7,9 +7,7 @@ import textwrap
 class _Spec:
     """A captured P4 block (parser, control, or deparser)."""
 
-    def __init__(
-        self, kind: str, name: str, source: str, annotations: dict
-    ) -> None:
+    def __init__(self, kind: str, name: str, source: str, annotations: dict) -> None:
         self._p4_kind = kind
         self._p4_name = name
         self._p4_source = source
@@ -19,9 +17,7 @@ class _Spec:
 def _make_decorator(kind: str):
     def decorator(func):
         source = textwrap.dedent(inspect.getsource(func))
-        annotations = {
-            k: v for k, v in func.__annotations__.items() if k != "return"
-        }
+        annotations = {k: v for k, v in func.__annotations__.items() if k != "return"}
         return _Spec(
             kind=kind, name=func.__name__, source=source, annotations=annotations
         )

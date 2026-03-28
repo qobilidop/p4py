@@ -142,10 +142,7 @@ def _ast_call_to_statement(call: ast.Call, params: set[str]) -> nodes.Statement:
         # Module-qualified function: name.func(args) where name is not a
         # block parameter (e.g. v1model.mark_to_drop).  Strip the module
         # prefix and emit a plain FunctionCall.
-        if (
-            isinstance(attr.value, ast.Name)
-            and attr.value.id not in params
-        ):
+        if isinstance(attr.value, ast.Name) and attr.value.id not in params:
             args = tuple(_ast_to_expression(a) for a in call.args)
             return nodes.FunctionCall(name=attr.attr, args=args)
         obj = _ast_to_field_access(attr.value)
@@ -179,7 +176,9 @@ def _compile_parser(spec) -> nodes.ParserDecl:
     return nodes.ParserDecl(name=spec._p4_name, states=tuple(states))
 
 
-def _compile_parser_state(func_def: ast.FunctionDef, params: set[str]) -> nodes.ParserState:
+def _compile_parser_state(
+    func_def: ast.FunctionDef, params: set[str]
+) -> nodes.ParserState:
     """Compile a nested function into a ParserState."""
     body_stmts: list[nodes.Statement] = []
     transition: nodes.Transition | nodes.TransitionSelect | None = None
