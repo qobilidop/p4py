@@ -13,8 +13,8 @@ import struct
 import subprocess
 import sys
 import tempfile
-import threading
 import time
+import uuid
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +202,36 @@ def _wait_for_thrift(port: int, timeout: float = 10.0) -> bool:
     return False
 
 
+def _setup_veth_pair(name: str) -> None:
+    """Create a veth pair and bring both ends up."""
+    peer = f"{name}_peer"
+    subprocess.run(
+        ["sudo", "ip", "link", "add", name, "type", "veth", "peer", "name", peer],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["sudo", "ip", "link", "set", name, "up"], check=True, capture_output=True
+    )
+    subprocess.run(
+        ["sudo", "ip", "link", "set", peer, "up"], check=True, capture_output=True
+    )
+    # Disable IPv6 to avoid spurious neighbor discovery packets.
+    for iface in (name, peer):
+        subprocess.run(
+            ["sudo", "sysctl", "-w", f"net.ipv6.conf.{iface}.disable_ipv6=1"],
+            check=True,
+            capture_output=True,
+        )
+
+
+def _teardown_veth_pair(name: str) -> None:
+    """Delete a veth pair (deleting one end removes both)."""
+    subprocess.run(
+        ["sudo", "ip", "link", "del", name], capture_output=True
+    )
+
+
 def run_stf_test(p4_path: str, stf_path: str) -> bool:
     """Run an STF test against BMv2. Returns True if all checks pass."""
     commands = parse_stf(stf_path)
@@ -228,31 +258,53 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
         elif cmd in ("add", "setdefault"):
             table_cmds.append((cmd, args))
 
+    # Use a unique suffix to avoid collisions between concurrent tests.
+    # Veth names are limited to 15 chars, so keep the suffix short.
+    suffix = uuid.uuid4().hex[:4]
+    veth_names: dict[int, str] = {}
+    for port in sorted(ports):
+        veth_names[port] = f"stf{suffix}p{port}"
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # Compile P4.
         json_path = compile_p4(p4_path, tmpdir)
 
-        # Create a named FIFO for each port.
-        for port in ports:
-            os.mkfifo(os.path.join(tmpdir, f"port{port}"))
+        # Create veth pairs for BMv2 interfaces.
+        for port in sorted(ports):
+            _setup_veth_pair(veth_names[port])
 
-        # Build simple_switch command.
+        # Write input pcap files. With --use-files, BMv2 reads from
+        # <interface_name>_in.pcap and writes to <interface_name>_out.pcap
+        # in the working directory.
+        pkts_by_port: dict[int, list[bytes]] = {}
+        for port, hex_data in send_packets:
+            pkts_by_port.setdefault(port, []).append(bytes.fromhex(hex_data))
+        for port in ports:
+            iface = veth_names[port]
+            in_path = os.path.join(tmpdir, f"{iface}_in.pcap")
+            write_pcap(in_path, pkts_by_port.get(port, []))
+
+        # Build simple_switch command with veth interfaces and --use-files.
+        # The delay gives us time to install table entries before packets
+        # are processed.
+        use_files_delay = 3
         iface_args: list[str] = []
         for port in sorted(ports):
-            iface_args.extend(["-i", f"{port}@{tmpdir}/port{port}"])
+            iface_args.extend(["-i", f"{port}@{veth_names[port]}"])
 
         thrift_port = 9090
         switch_proc = subprocess.Popen(
             [
                 "simple_switch",
-                "--log-file", f"{tmpdir}/switch.log",
+                "--log-file", os.path.join(tmpdir, "switch.log"),
                 "--log-flush",
-                "--use-files", "0",
+                "--use-files", str(use_files_delay),
                 "--thrift-port", str(thrift_port),
                 "--device-id", "0",
             ]
             + iface_args
             + [json_path],
+            cwd=tmpdir,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -260,7 +312,14 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
         try:
             # Wait for Thrift server.
             if not _wait_for_thrift(thrift_port):
-                print("ERROR: Timed out waiting for simple_switch", file=sys.stderr)
+                print(
+                    "ERROR: Timed out waiting for simple_switch",
+                    file=sys.stderr,
+                )
+                log_path = os.path.join(tmpdir, "switch.log")
+                if os.path.exists(log_path):
+                    with open(log_path) as f:
+                        print(f"SWITCH LOG:\n{f.read()}", file=sys.stderr)
                 return False
 
             # Install table entries.
@@ -272,39 +331,27 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
                     elif cmd == "setdefault":
                         cli_lines.append(parse_stf_setdefault(args))
                 cli_input = "\n".join(cli_lines) + "\n"
-                subprocess.run(
+                cli_result = subprocess.run(
                     ["simple_switch_CLI", "--thrift-port", str(thrift_port)],
                     input=cli_input,
                     capture_output=True,
                     text=True,
-                    check=True,
                 )
+                if cli_result.returncode != 0:
+                    print(
+                        f"CLI failed: {cli_result.stderr}",
+                        file=sys.stderr,
+                    )
+                    return False
 
-            # Group packets by port.
-            pkts_by_port: dict[int, list[bytes]] = {}
-            for port, hex_data in send_packets:
-                pkts_by_port.setdefault(port, []).append(bytes.fromhex(hex_data))
-
-            # Write packets to FIFOs in threads (writes block until reader).
-            def _write_port(port: int) -> None:
-                fifo = os.path.join(tmpdir, f"port{port}")
-                write_pcap(fifo, pkts_by_port.get(port, []))
-
-            threads = [
-                threading.Thread(target=_write_port, args=(p,)) for p in sorted(ports)
-            ]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join(timeout=5)
-
-            # Wait for BMv2 to process.
-            time.sleep(1)
+            # Wait for BMv2 to process packets (delay + processing time).
+            time.sleep(use_files_delay + 2)
 
             # Read output pcap files.
             output_by_port: dict[int, list[bytes]] = {}
             for port in ports:
-                out_path = os.path.join(tmpdir, f"port{port}_out.pcap")
+                iface = veth_names[port]
+                out_path = os.path.join(tmpdir, f"{iface}_out.pcap")
                 output_by_port[port] = read_pcap(out_path)
 
             # Verify expected packets.
@@ -334,6 +381,9 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
             except subprocess.TimeoutExpired:
                 switch_proc.kill()
                 switch_proc.wait()
+            # Clean up veth pairs.
+            for port in sorted(ports):
+                _teardown_veth_pair(veth_names[port])
 
 
 # ---------------------------------------------------------------------------

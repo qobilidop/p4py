@@ -13,7 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     shellcheck \
+    iproute2 \
     software-properties-common \
+    sudo \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -67,9 +69,11 @@ RUN pip install \
     ruff
 
 # Create non-root user. Bazel discourages running as root.
+# Grant passwordless sudo for network setup (veth pairs for BMv2 testing).
 RUN useradd -m dev && \
     mkdir -p /home/dev/.cache/bazel && \
-    chown -R dev:dev /home/dev
+    chown -R dev:dev /home/dev && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Trust /workspace for git operations.
 RUN git config --system --add safe.directory /workspace

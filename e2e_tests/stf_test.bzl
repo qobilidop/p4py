@@ -15,6 +15,8 @@ def stf_test(name, p4_program, stf_file, **kwargs):
     if "e2e" not in tags:
         tags = tags + ["e2e"]
 
+    # Run locally (no sandbox) because the test needs sudo for veth pairs
+    # and access to system tools (p4c, simple_switch, simple_switch_CLI).
     py_test(
         name = name,
         srcs = ["//e2e_tests:stf_runner.py"],
@@ -25,6 +27,8 @@ def stf_test(name, p4_program, stf_file, **kwargs):
             "$(rootpath " + stf_file + ")",
         ],
         deps = ["//e2e_tests:stf_runner"],
-        tags = tags,
+        tags = tags + ["local"],
+        local = True,
+        timeout = "short",
         **kwargs
     )
