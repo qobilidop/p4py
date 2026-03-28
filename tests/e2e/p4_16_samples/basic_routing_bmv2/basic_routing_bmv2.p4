@@ -28,6 +28,7 @@ struct headers_t {
 }
 
 struct metadata_t {
+    bit<16> nexthop_index;
 }
 
 parser ParserImpl(packet_in pkt,
@@ -54,31 +55,44 @@ control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {
 control ingress(inout headers_t hdr,
                   inout metadata_t meta,
                   inout standard_metadata_t std_meta) {
-    action forward(bit<9> port) {
-        std_meta.egress_spec = port;
+    action on_miss() {
+    }
+
+    action fib_hit_nexthop(bit<16> nexthop_index) {
+        meta.nexthop_index = nexthop_index;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
-    action drop() {
-        mark_to_drop(std_meta);
+    action set_egress_details(bit<9> egress_spec) {
+        std_meta.egress_spec = egress_spec;
     }
 
-    table ipv4_lpm {
+    table ipv4_fib_lpm {
         key = {
             hdr.ipv4.dstAddr: lpm;
         }
         actions = {
-            forward;
-            drop;
+            on_miss;
+            fib_hit_nexthop;
         }
-        default_action = drop();
+        default_action = on_miss();
+    }
+
+    table nexthop {
+        key = {
+            meta.nexthop_index: exact;
+        }
+        actions = {
+            on_miss;
+            set_egress_details;
+        }
+        default_action = on_miss();
     }
 
     apply {
         if (hdr.ipv4.isValid()) {
-            ipv4_lpm.apply();
-        } else {
-            drop();
+            ipv4_fib_lpm.apply();
+            nexthop.apply();
         }
     }
 }
