@@ -24,7 +24,7 @@ def emit(program: nodes.Program) -> str:
     _emit_parser(lines, program.parser)
     _emit_verify_checksum(lines)
     _emit_control(lines, program.ingress)
-    _emit_egress(lines)
+    _emit_egress(lines, program.egress)
     _emit_compute_checksum(lines)
     _emit_deparser(lines, program.deparser)
     _emit_main(lines, program)
@@ -147,13 +147,16 @@ def _emit_verify_checksum(lines: list[str]) -> None:
     lines.append("")
 
 
-def _emit_egress(lines: list[str]) -> None:
-    lines.append("control MyEgress(inout headers_t hdr,")
-    lines.append("                  inout metadata_t meta,")
-    lines.append("                  inout standard_metadata_t std_meta) {")
-    lines.append("    apply {}")
-    lines.append("}")
-    lines.append("")
+def _emit_egress(lines: list[str], egress: nodes.ControlDecl | None) -> None:
+    if egress is not None:
+        _emit_control(lines, egress)
+    else:
+        lines.append("control MyEgress(inout headers_t hdr,")
+        lines.append("                  inout metadata_t meta,")
+        lines.append("                  inout standard_metadata_t std_meta) {")
+        lines.append("    apply {}")
+        lines.append("}")
+        lines.append("")
 
 
 def _emit_compute_checksum(lines: list[str]) -> None:
@@ -166,11 +169,12 @@ def _emit_compute_checksum(lines: list[str]) -> None:
 
 
 def _emit_main(lines: list[str], program: nodes.Program) -> None:
+    egress_name = program.egress.name if program.egress else "MyEgress"
     lines.append("V1Switch(")
     lines.append(f"    {program.parser.name}(),")
     lines.append("    MyVerifyChecksum(),")
     lines.append(f"    {program.ingress.name}(),")
-    lines.append("    MyEgress(),")
+    lines.append(f"    {egress_name}(),")
     lines.append("    MyComputeChecksum(),")
     lines.append(f"    {program.deparser.name}()")
     lines.append(") main;")

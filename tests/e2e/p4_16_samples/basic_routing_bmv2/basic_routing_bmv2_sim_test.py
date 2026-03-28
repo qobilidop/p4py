@@ -54,6 +54,19 @@ TABLE_ENTRIES = {
             "args": {"nexthop_index": 2},
         },
     ],
+    # Rewrite MAC: nexthop 1 → AA:01/BB:01, nexthop 2 → AA:02/BB:02
+    "rewrite_mac_table": [
+        {
+            "key": {"meta.nexthop_index": 1},
+            "action": "rewrite_mac",
+            "args": {"smac": 0x00000000AA01, "dmac": 0x00000000BB01},
+        },
+        {
+            "key": {"meta.nexthop_index": 2},
+            "action": "rewrite_mac",
+            "args": {"smac": 0x00000000AA02, "dmac": 0x00000000BB02},
+        },
+    ],
     # Nexthop: 1 → port 5, 2 → port 7
     "nexthop": [
         {
@@ -140,6 +153,37 @@ class TestBasicRoutingSim:
         # but FIB still routes the packet.
         assert not result.dropped
         assert result.egress_port == 5
+
+    def test_egress_rewrites_mac(self):
+        """Egress rewrite_mac table rewrites src/dst MAC after routing."""
+        result = simulate(
+            self.program,
+            packet=TEST_PACKET,
+            ingress_port=0,
+            table_entries=TABLE_ENTRIES,
+        )
+        assert not result.dropped
+        assert result.egress_port == 5
+        # dstAddr rewritten to 00:00:00:00:BB:01
+        assert result.packet[0:6] == b"\x00\x00\x00\x00\xbb\x01"
+        # srcAddr rewritten to 00:00:00:00:AA:01
+        assert result.packet[6:12] == b"\x00\x00\x00\x00\xaa\x01"
+
+    def test_egress_rewrite_lpm_path(self):
+        """Egress rewrites MAC on the LPM fallback path too."""
+        packet = bytearray(TEST_PACKET)
+        packet[30:34] = (0x0A010001).to_bytes(4)  # 10.1.0.1 → LPM match
+        result = simulate(
+            self.program,
+            packet=bytes(packet),
+            ingress_port=0,
+            table_entries=TABLE_ENTRIES,
+        )
+        assert not result.dropped
+        assert result.egress_port == 7
+        # nexthop 2 → smac AA:02, dmac BB:02
+        assert result.packet[0:6] == b"\x00\x00\x00\x00\xbb\x02"
+        assert result.packet[6:12] == b"\x00\x00\x00\x00\xaa\x02"
 
     def test_non_ipv4_dropped(self):
         """Non-IPv4 packet is not processed (no isValid)."""

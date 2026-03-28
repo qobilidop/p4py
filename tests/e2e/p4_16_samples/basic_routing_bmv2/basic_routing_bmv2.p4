@@ -146,10 +146,31 @@ control ingress(inout headers_t hdr,
     }
 }
 
-control MyEgress(inout headers_t hdr,
+control egress(inout headers_t hdr,
                   inout metadata_t meta,
                   inout standard_metadata_t std_meta) {
-    apply {}
+    action on_miss() {
+    }
+
+    action rewrite_mac(bit<48> smac, bit<48> dmac) {
+        hdr.ethernet.srcAddr = smac;
+        hdr.ethernet.dstAddr = dmac;
+    }
+
+    table rewrite_mac_table {
+        key = {
+            meta.nexthop_index: exact;
+        }
+        actions = {
+            on_miss;
+            rewrite_mac;
+        }
+        default_action = on_miss();
+    }
+
+    apply {
+        rewrite_mac_table.apply();
+    }
 }
 
 control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
@@ -167,7 +188,7 @@ V1Switch(
     ParserImpl(),
     MyVerifyChecksum(),
     ingress(),
-    MyEgress(),
+    egress(),
     MyComputeChecksum(),
     DeparserImpl()
 ) main;

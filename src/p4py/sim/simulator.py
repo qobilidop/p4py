@@ -85,6 +85,9 @@ def simulate(
     if state.std_meta["egress_spec"] == _DROP_PORT:
         return SimResult(packet=None, egress_port=_DROP_PORT, dropped=True)
 
+    if program.egress is not None:
+        _run_control(state, program.egress, table_entries)
+
     output = _run_deparser(state, program.deparser)
     return SimResult(
         packet=bytes(output),

@@ -11,3 +11,9 @@ py_test(
     srcs = ["test_std_meta_table_key.py"],
     deps = ["//src/p4py"],
 )
+
+py_test(
+    name = "test_egress_sim",
+    srcs = ["test_egress_sim.py"],
+    deps = ["//src/p4py"],
+)

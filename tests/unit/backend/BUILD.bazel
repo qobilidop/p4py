@@ -5,3 +5,9 @@ py_test(
     srcs = ["test_p4.py"],
     deps = ["//src/p4py"],
 )
+
+py_test(
+    name = "test_egress_emit",
+    srcs = ["test_egress_emit.py"],
+    deps = ["//src/p4py"],
+)

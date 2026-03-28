@@ -17,6 +17,7 @@ def compile(pipeline: V1Switch) -> nodes.Program:
     structs_ir = _compile_structs(pipeline.headers, pipeline.metadata)
     parser_ir = _compile_parser(pipeline.parser)
     ingress_ir = _compile_control(pipeline.ingress)
+    egress_ir = _compile_control(pipeline.egress) if pipeline.egress else None
     deparser_ir = _compile_deparser(pipeline.deparser)
     return nodes.Program(
         headers=headers_ir,
@@ -24,6 +25,7 @@ def compile(pipeline: V1Switch) -> nodes.Program:
         parser=parser_ir,
         ingress=ingress_ir,
         deparser=deparser_ir,
+        egress=egress_ir,
     )
 
 

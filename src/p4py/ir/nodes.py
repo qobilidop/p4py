@@ -225,3 +225,4 @@ class Program:
     parser: ParserDecl
     ingress: ControlDecl
     deparser: DeparserDecl
+    egress: ControlDecl | None = None

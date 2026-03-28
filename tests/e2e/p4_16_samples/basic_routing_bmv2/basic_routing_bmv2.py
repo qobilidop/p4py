@@ -59,8 +59,24 @@ def ParserImpl(pkt, hdr: headers_t, meta: metadata_t, std_meta):
         return p4.ACCEPT
 
 
-# TODO: Add egress control with rewrite_mac table.
-# Requires: egress pipeline support in V1Switch.
+@p4.control
+def egress(hdr, meta, std_meta):
+    @p4.action
+    def on_miss():
+        pass
+
+    @p4.action
+    def rewrite_mac(smac: p4.bit(48), dmac: p4.bit(48)):
+        hdr.ethernet.srcAddr = smac
+        hdr.ethernet.dstAddr = dmac
+
+    rewrite_mac_table = p4.table(
+        key={meta.nexthop_index: p4.exact},
+        actions=[on_miss, rewrite_mac],
+        default_action=on_miss,
+    )
+
+    rewrite_mac_table.apply()
 
 
 @p4.control
@@ -139,5 +155,6 @@ def DeparserImpl(pkt, hdr):
 main = v1model.V1Switch(
     parser=ParserImpl,
     ingress=ingress,
+    egress=egress,
     deparser=DeparserImpl,
 )
