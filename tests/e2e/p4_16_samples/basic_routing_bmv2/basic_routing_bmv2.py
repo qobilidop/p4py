@@ -76,11 +76,12 @@ def ingress(hdr, meta, std_meta):
         meta.nexthop_index = nexthop_index
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1
 
-    # The original uses both an exact-match ipv4_fib and an lpm ipv4_fib_lpm
-    # with a switch on action_run to fall through. We simplify to a single
-    # LPM table.
-    # TODO: Add ipv4_fib exact table + switch on action_run fallthrough.
-    # Requires: switch statement, action_run.
+    ipv4_fib = p4.table(
+        key={hdr.ipv4.dstAddr: p4.exact},
+        actions=[on_miss, fib_hit_nexthop],
+        default_action=on_miss,
+    )
+
     ipv4_fib_lpm = p4.table(
         key={hdr.ipv4.dstAddr: p4.lpm},
         actions=[on_miss, fib_hit_nexthop],
@@ -98,7 +99,10 @@ def ingress(hdr, meta, std_meta):
     )
 
     if hdr.ipv4.isValid():
-        ipv4_fib_lpm.apply()
+        # Try exact FIB first; fall through to LPM on miss.
+        match ipv4_fib.apply():
+            case "on_miss":
+                ipv4_fib_lpm.apply()
         nexthop.apply()
 
 

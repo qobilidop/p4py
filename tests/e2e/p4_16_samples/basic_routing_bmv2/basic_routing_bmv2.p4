@@ -67,6 +67,17 @@ control ingress(inout headers_t hdr,
         std_meta.egress_spec = egress_spec;
     }
 
+    table ipv4_fib {
+        key = {
+            hdr.ipv4.dstAddr: exact;
+        }
+        actions = {
+            on_miss;
+            fib_hit_nexthop;
+        }
+        default_action = on_miss();
+    }
+
     table ipv4_fib_lpm {
         key = {
             hdr.ipv4.dstAddr: lpm;
@@ -91,7 +102,11 @@ control ingress(inout headers_t hdr,
 
     apply {
         if (hdr.ipv4.isValid()) {
-            ipv4_fib_lpm.apply();
+            switch (ipv4_fib.apply().action_run) {
+                on_miss: {
+                    ipv4_fib_lpm.apply();
+                }
+            }
             nexthop.apply();
         }
     }
