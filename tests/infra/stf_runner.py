@@ -17,7 +17,6 @@ import time
 import uuid
 from dataclasses import dataclass
 
-
 # ---------------------------------------------------------------------------
 # STF parsing
 # ---------------------------------------------------------------------------
@@ -115,9 +114,7 @@ def stf_to_sim_inputs(stf_text: str) -> SimInputs:
             )
             expects.append(SimExpect(port=port, pattern=pattern))
 
-    return SimInputs(
-        table_entries=table_entries, packets=packets, expects=expects
-    )
+    return SimInputs(table_entries=table_entries, packets=packets, expects=expects)
 
 
 def _strip_control_prefix(name: str) -> str:
@@ -125,9 +122,7 @@ def _strip_control_prefix(name: str) -> str:
     return name.rsplit(".", 1)[-1]
 
 
-def _parse_stf_add_to_sim(
-    args: str, table_entries: dict[str, list[dict]]
-) -> None:
+def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> None:
     """Parse an STF 'add' command into simulator table_entries format."""
     tokens = args.split()
     table = _strip_control_prefix(tokens[0])
@@ -152,12 +147,8 @@ def _parse_stf_add_to_sim(
             key_pairs.append((field, value))
 
     # Parse action name and parameters.
-    action_name = _strip_control_prefix(
-        action_token[: action_token.index("(")]
-    )
-    params_str = action_token[
-        action_token.index("(") + 1 : action_token.rindex(")")
-    ]
+    action_name = _strip_control_prefix(action_token[: action_token.index("(")])
+    params_str = action_token[action_token.index("(") + 1 : action_token.rindex(")")]
     action_args: dict[str, int] = {}
     if params_str.strip():
         for param in params_str.split(","):
@@ -180,11 +171,12 @@ def _parse_stf_add_to_sim(
 _PCAP_GLOBAL_HEADER = struct.pack(
     "<IHHiIII",
     0xA1B2C3D4,  # magic
-    2, 4,         # version
-    0,            # thiszone
-    0,            # sigfigs
-    65535,        # snaplen
-    1,            # Ethernet link type
+    2,
+    4,  # version
+    0,  # thiszone
+    0,  # sigfigs
+    65535,  # snaplen
+    1,  # Ethernet link type
 )
 
 
@@ -346,9 +338,7 @@ def _setup_veth_pair(name: str) -> None:
 
 def _teardown_veth_pair(name: str) -> None:
     """Delete a veth pair (deleting one end removes both)."""
-    subprocess.run(
-        ["sudo", "ip", "link", "del", name], capture_output=True
-    )
+    subprocess.run(["sudo", "ip", "link", "del", name], capture_output=True)
 
 
 def run_stf_test(p4_path: str, stf_path: str) -> bool:
@@ -357,7 +347,7 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
 
     # Classify commands.
     table_cmds: list[tuple[str, str]] = []
-    send_packets: list[tuple[int, str]] = []   # (port, hex_data)
+    send_packets: list[tuple[int, str]] = []  # (port, hex_data)
     expect_packets: list[tuple[int, str | None]] = []  # (port, hex_pattern)
     ports: set[int] = set()
 
@@ -372,9 +362,7 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
             parts = args.split(None, 1)
             port = int(parts[0])
             hex_pattern = (
-                parts[1].replace(" ", "").rstrip("$")
-                if len(parts) > 1
-                else None
+                parts[1].replace(" ", "").rstrip("$") if len(parts) > 1 else None
             )
             ports.add(port)
             expect_packets.append((port, hex_pattern))
@@ -419,11 +407,15 @@ def run_stf_test(p4_path: str, stf_path: str) -> bool:
         switch_proc = subprocess.Popen(
             [
                 "simple_switch",
-                "--log-file", os.path.join(tmpdir, "switch.log"),
+                "--log-file",
+                os.path.join(tmpdir, "switch.log"),
                 "--log-flush",
-                "--use-files", str(use_files_delay),
-                "--thrift-port", str(thrift_port),
-                "--device-id", "0",
+                "--use-files",
+                str(use_files_delay),
+                "--thrift-port",
+                str(thrift_port),
+                "--device-id",
+                "0",
             ]
             + iface_args
             + [json_path],

@@ -1,5 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
-load("//e2e_tests:stf_test.bzl", "stf_test")
+load("//tests/infra:stf_test.bzl", "stf_test")
 
 stf_test(
     name = "basic_forward_test",
@@ -25,8 +25,8 @@ py_test(
     ],
     deps = [
         ":basic_forward",
-        "//e2e_tests:stf_runner",
         "//src/p4py",
+        "//tests/infra:stf_runner",
     ],
 )
 
@@ -41,7 +41,7 @@ py_test(
     ],
     deps = [
         ":basic_forward",
-        "//e2e_tests:stf_runner",
         "//src/p4py",
+        "//tests/infra:stf_runner",
     ],
 )

@@ -19,14 +19,14 @@ def stf_test(name, p4_program, stf_file, **kwargs):
     # and access to system tools (p4c, simple_switch, simple_switch_CLI).
     py_test(
         name = name,
-        srcs = ["//e2e_tests:stf_runner.py"],
+        srcs = ["//tests/infra:stf_runner.py"],
         main = "stf_runner.py",
         data = [p4_program, stf_file],
         args = [
             "$(rootpath " + p4_program + ")",
             "$(rootpath " + stf_file + ")",
         ],
-        deps = ["//e2e_tests:stf_runner"],
+        deps = ["//tests/infra:stf_runner"],
         tags = tags + ["local"],
         local = True,
         timeout = "short",

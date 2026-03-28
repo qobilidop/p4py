@@ -21,7 +21,7 @@ where = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
-src = ["src", "tests"]
+src = ["src", "tests", "examples"]
 line-length = 88
 
 [tool.ruff.lint]
@@ -47,3 +47,8 @@ select = [
 "tests/backend/*" = ["N801", "N802", "N815"]
 "tests/sim/*" = ["N801", "N802", "N815"]
 "tests/test_integration.py" = ["N801", "N802", "N815"]
+"examples/*" = ["N801", "N802", "N815"]
+# Pre-existing issues in test infra and example tests; clean up separately.
+"tests/infra/*" = ["B905", "SIM108", "RUF005", "E501"]
+"examples/*/basic_forward_diff_test.py" = ["B905"]
+"examples/*/basic_forward_testgen_test.py" = ["B905", "B007"]

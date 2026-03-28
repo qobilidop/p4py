@@ -1,6 +1,6 @@
 """Unit tests for the STF runner's parser and hex matcher."""
 
-from e2e_tests.stf_runner import (
+from tests.infra.stf_runner import (
     match_hex,
     parse_stf_add,
     parse_stf_setdefault,
@@ -34,13 +34,7 @@ class TestParseStf:
         assert cmds == [("setdefault", "MyIngress.t MyIngress.drop()")]
 
     def test_mixed(self):
-        stf = (
-            "# Setup\n"
-            "add T A(p:1) k:0x01\n"
-            "\n"
-            "packet 0 AABB\n"
-            "expect 1 AABB\n"
-        )
+        stf = "# Setup\nadd T A(p:1) k:0x01\n\npacket 0 AABB\nexpect 1 AABB\n"
         cmds = parse_stf_string(stf)
         assert len(cmds) == 3
         assert cmds[0][0] == "add"
@@ -72,7 +66,10 @@ class TestParseStfAdd:
     def test_exact_match_single_param(self):
         args = "MyIngress.mac_table MyIngress.forward(port:2) hdr.ethernet.dstAddr:0x000000000001"
         result = parse_stf_add(args)
-        assert result == "table_add MyIngress.mac_table MyIngress.forward 0x000000000001 => 2"
+        assert (
+            result
+            == "table_add MyIngress.mac_table MyIngress.forward 0x000000000001 => 2"
+        )
 
     def test_multiple_keys_and_params(self):
         args = "T A(p1:10, p2:20) k1:0xAA k2:0xBB"
@@ -112,22 +109,20 @@ class TestStfToSimInputs:
         }
         assert len(result.packets) == 1
         assert result.packets[0].port == 1
-        assert result.packets[0].data == bytes.fromhex(
-            "000000000001000000000002" "0800"
-        )
+        assert result.packets[0].data == bytes.fromhex("0000000000010000000000020800")
         assert len(result.expects) == 1
         assert result.expects[0].port == 2
-        assert result.expects[0].pattern == "000000000001000000000002" "0800"
+        assert result.expects[0].pattern == "0000000000010000000000020800"
 
     def test_no_table_entries(self):
-        stf = "packet 0 AABB\n" "expect 1 AABB\n"
+        stf = "packet 0 AABB\nexpect 1 AABB\n"
         result = stf_to_sim_inputs(stf)
         assert result.table_entries == {}
         assert len(result.packets) == 1
         assert len(result.expects) == 1
 
     def test_multiple_packets(self):
-        stf = "packet 0 AA\n" "packet 1 BB\n" "expect 0 BB\n" "expect 1 AA\n"
+        stf = "packet 0 AA\npacket 1 BB\nexpect 0 BB\nexpect 1 AA\n"
         result = stf_to_sim_inputs(stf)
         assert len(result.packets) == 2
         assert len(result.expects) == 2
@@ -135,12 +130,12 @@ class TestStfToSimInputs:
         assert result.packets[1].port == 1
 
     def test_expect_end_of_packet_marker(self):
-        stf = "packet 0 AABB\n" "expect 1 AABB$\n"
+        stf = "packet 0 AABB\nexpect 1 AABB$\n"
         result = stf_to_sim_inputs(stf)
         assert result.expects[0].pattern == "aabb"
 
     def test_drop_test_no_expect(self):
-        stf = "add T A()\n" "packet 0 AABB\n"
+        stf = "add T A()\npacket 0 AABB\n"
         result = stf_to_sim_inputs(stf)
         assert len(result.packets) == 1
         assert len(result.expects) == 0

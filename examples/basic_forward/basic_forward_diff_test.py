@@ -7,12 +7,13 @@ the Python simulator and BMv2 simple_switch, and asserts matching output.
 import os
 import tempfile
 
-from e2e_tests.basic_forward.basic_forward import main
-from e2e_tests.stf_runner import (
+from tests.infra.stf_runner import (
     match_hex,
     run_stf_test,
     stf_to_sim_inputs,
 )
+
+from examples.basic_forward.basic_forward import main
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
 from p4py.sim import simulate
