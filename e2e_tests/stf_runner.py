@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import uuid
+from dataclasses import dataclass
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +53,120 @@ def match_hex(actual: str, expected: str) -> bool:
     if len(actual) != len(expected):
         return False
     return all(e == "*" or a == e for a, e in zip(actual, expected))
+
+
+# ---------------------------------------------------------------------------
+# STF to simulator translation
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SimPacket:
+    """A packet to send to the simulator."""
+
+    port: int
+    data: bytes
+
+
+@dataclass
+class SimExpect:
+    """An expected output packet."""
+
+    port: int
+    pattern: str | None
+
+
+@dataclass
+class SimInputs:
+    """Parsed STF translated to simulator inputs."""
+
+    table_entries: dict[str, list[dict]]
+    packets: list[SimPacket]
+    expects: list[SimExpect]
+
+
+def stf_to_sim_inputs(stf_text: str) -> SimInputs:
+    """Translate STF text into simulator inputs.
+
+    Strips control-block prefixes (e.g. 'MyIngress.') from table and
+    action names so the result matches the simulator's naming convention.
+    """
+    commands = parse_stf_string(stf_text)
+
+    table_entries: dict[str, list[dict]] = {}
+    packets: list[SimPacket] = []
+    expects: list[SimExpect] = []
+
+    for cmd, args in commands:
+        if cmd == "add":
+            _parse_stf_add_to_sim(args, table_entries)
+        elif cmd == "packet":
+            parts = args.split(None, 1)
+            port = int(parts[0])
+            hex_data = parts[1].replace(" ", "") if len(parts) > 1 else ""
+            packets.append(SimPacket(port=port, data=bytes.fromhex(hex_data)))
+        elif cmd == "expect":
+            parts = args.split(None, 1)
+            port = int(parts[0])
+            pattern = parts[1].replace(" ", "") if len(parts) > 1 else None
+            expects.append(SimExpect(port=port, pattern=pattern))
+
+    return SimInputs(
+        table_entries=table_entries, packets=packets, expects=expects
+    )
+
+
+def _strip_control_prefix(name: str) -> str:
+    """Strip a dotted control-block prefix: 'MyIngress.foo' -> 'foo'."""
+    return name.rsplit(".", 1)[-1]
+
+
+def _parse_stf_add_to_sim(
+    args: str, table_entries: dict[str, list[dict]]
+) -> None:
+    """Parse an STF 'add' command into simulator table_entries format."""
+    tokens = args.split()
+    table = _strip_control_prefix(tokens[0])
+
+    action_token = ""
+    key_pairs: list[tuple[str, str]] = []
+    in_action = False
+
+    for token in tokens[1:]:
+        if "(" in token and not in_action:
+            action_token = token
+            if ")" in token:
+                in_action = False
+            else:
+                in_action = True
+        elif in_action:
+            action_token += " " + token
+            if ")" in token:
+                in_action = False
+        elif ":" in token:
+            field, value = token.split(":", 1)
+            key_pairs.append((field, value))
+
+    # Parse action name and parameters.
+    action_name = _strip_control_prefix(
+        action_token[: action_token.index("(")]
+    )
+    params_str = action_token[
+        action_token.index("(") + 1 : action_token.rindex(")")
+    ]
+    action_args: dict[str, int] = {}
+    if params_str.strip():
+        for param in params_str.split(","):
+            name, value = param.strip().split(":", 1)
+            action_args[name.strip()] = int(value.strip(), 0)
+
+    # Build key dict.
+    key_dict: dict[str, int] = {}
+    for field, value in key_pairs:
+        key_dict[field] = int(value, 0)
+
+    entry = {"key": key_dict, "action": action_name, "args": action_args}
+    table_entries.setdefault(table, []).append(entry)
 
 
 # ---------------------------------------------------------------------------

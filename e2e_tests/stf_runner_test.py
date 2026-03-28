@@ -5,6 +5,7 @@ from e2e_tests.stf_runner import (
     parse_stf_add,
     parse_stf_setdefault,
     parse_stf_string,
+    stf_to_sim_inputs,
 )
 
 
@@ -89,3 +90,46 @@ class TestParseStfSetdefault:
         args = "T A(p:5)"
         result = parse_stf_setdefault(args)
         assert result == "table_set_default T A 5"
+
+
+class TestStfToSimInputs:
+    def test_basic_forward(self):
+        stf = (
+            "add MyIngress.mac_table MyIngress.forward(port:2)"
+            " hdr.ethernet.dstAddr:0x000000000001\n"
+            "packet 1 000000000001 000000000002 0800\n"
+            "expect 2 000000000001 000000000002 0800\n"
+        )
+        result = stf_to_sim_inputs(stf)
+        assert result.table_entries == {
+            "mac_table": [
+                {
+                    "key": {"hdr.ethernet.dstAddr": 0x000000000001},
+                    "action": "forward",
+                    "args": {"port": 2},
+                },
+            ],
+        }
+        assert len(result.packets) == 1
+        assert result.packets[0].port == 1
+        assert result.packets[0].data == bytes.fromhex(
+            "000000000001000000000002" "0800"
+        )
+        assert len(result.expects) == 1
+        assert result.expects[0].port == 2
+        assert result.expects[0].pattern == "000000000001000000000002" "0800"
+
+    def test_no_table_entries(self):
+        stf = "packet 0 AABB\n" "expect 1 AABB\n"
+        result = stf_to_sim_inputs(stf)
+        assert result.table_entries == {}
+        assert len(result.packets) == 1
+        assert len(result.expects) == 1
+
+    def test_multiple_packets(self):
+        stf = "packet 0 AA\n" "packet 1 BB\n" "expect 0 BB\n" "expect 1 AA\n"
+        result = stf_to_sim_inputs(stf)
+        assert len(result.packets) == 2
+        assert len(result.expects) == 2
+        assert result.packets[0].port == 0
+        assert result.packets[1].port == 1

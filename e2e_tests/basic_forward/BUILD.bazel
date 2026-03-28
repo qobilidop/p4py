@@ -1,7 +1,31 @@
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//e2e_tests:stf_test.bzl", "stf_test")
 
 stf_test(
     name = "basic_forward_test",
     p4_program = "basic_forward.p4",
     stf_file = "basic_forward.stf",
+)
+
+py_library(
+    name = "basic_forward",
+    srcs = ["basic_forward.py"],
+    deps = ["//src/p4py"],
+)
+
+py_test(
+    name = "basic_forward_diff_test",
+    timeout = "short",
+    srcs = ["basic_forward_diff_test.py"],
+    data = ["basic_forward.stf"],
+    local = True,
+    tags = [
+        "e2e",
+        "local",
+    ],
+    deps = [
+        ":basic_forward",
+        "//e2e_tests:stf_runner",
+        "//src/p4py",
+    ],
 )
