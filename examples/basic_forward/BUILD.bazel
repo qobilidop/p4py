@@ -14,6 +14,16 @@ py_library(
 )
 
 py_test(
+    name = "basic_forward_golden_test",
+    srcs = ["basic_forward_golden_test.py"],
+    data = ["basic_forward.p4"],
+    deps = [
+        ":basic_forward",
+        "//src/p4py",
+    ],
+)
+
+py_test(
     name = "basic_forward_diff_test",
     timeout = "short",
     srcs = ["basic_forward_diff_test.py"],

@@ -1,9 +1,3 @@
-/* basic_forward.p4 - Minimal v1model L2 forwarder.
- *
- * Parses Ethernet, looks up dstAddr in an exact-match table,
- * and forwards to the specified port.
- */
-
 #include <core.p4>
 #include <v1model.p4>
 
@@ -17,7 +11,8 @@ struct headers_t {
     ethernet_t ethernet;
 }
 
-struct metadata_t {}
+struct metadata_t {
+}
 
 parser MyParser(packet_in pkt,
                 out headers_t hdr,
@@ -53,7 +48,6 @@ control MyIngress(inout headers_t hdr,
             drop;
         }
         default_action = drop();
-        size = 1024;
     }
 
     apply {
@@ -62,8 +56,8 @@ control MyIngress(inout headers_t hdr,
 }
 
 control MyEgress(inout headers_t hdr,
-                 inout metadata_t meta,
-                 inout standard_metadata_t std_meta) {
+                  inout metadata_t meta,
+                  inout standard_metadata_t std_meta) {
     apply {}
 }
 
