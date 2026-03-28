@@ -4,6 +4,8 @@
     "dockerfile": "Dockerfile",
     "options": ["--platform=linux/amd64"]
   },
+  "capAdd": ["NET_ADMIN"],
+  "runArgs": ["--cap-add=NET_ADMIN"],
   "remoteUser": "dev",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
   "workspaceFolder": "/workspace",
