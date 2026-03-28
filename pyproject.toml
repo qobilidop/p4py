@@ -32,3 +32,9 @@ select = [
   "SIM", # flake8-simplify
   "RUF", # ruff-specific rules
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# P4 eDSL uses lowercase class names (header, struct) and P4-style field names.
+"src/p4py/lang/header.py" = ["N801"]
+"src/p4py/lang/struct.py" = ["N801"]
+"tests/lang/*" = ["N801", "N815"]

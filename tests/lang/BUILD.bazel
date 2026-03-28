@@ -1,0 +1,19 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "test_bit",
+    srcs = ["test_bit.py"],
+    deps = ["//src/p4py"],
+)
+
+py_test(
+    name = "test_header",
+    srcs = ["test_header.py"],
+    deps = ["//src/p4py"],
+)
+
+py_test(
+    name = "test_struct",
+    srcs = ["test_struct.py"],
+    deps = ["//src/p4py"],
+)
