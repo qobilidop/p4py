@@ -83,8 +83,8 @@ supported constructs to their spec sections.
 | Control declaration | Yes       | [§14 Control blocks][control] |                                |
 | Actions             | Yes       | [§14 Control blocks][actions] | Direction-less parameters only |
 | Tables              | Yes       | [§14 Control blocks][tables]  |                                |
-| `exact` match       | Yes       | [§14 Control blocks][tables]  | Only match kind                |
-| `lpm` match         | No        | [§14 Control blocks][tables]  |                                |
+| `exact` match       | Yes       | [§14 Control blocks][tables]  |                                |
+| `lpm` match         | Yes       | [§14 Control blocks][tables]  |                                |
 | `ternary` match     | No        | [§14 Control blocks][tables]  |                                |
 | `range` match       | No        | [§14 Control blocks][tables]  |                                |
 | `table.apply()`     | Yes       | [§14 Control blocks][control] |                                |

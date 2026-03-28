@@ -165,22 +165,73 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
     table = ctx.tables[table_name]
     entries = ctx.entries.get(table_name, [])
 
-    # Build the lookup key from current header values.
+    # Build the lookup key, match kind, and field width maps.
     lookup_key = {}
+    match_kinds = {}
+    field_widths = {}
     for table_key in table.keys:
         field_path = ".".join(table_key.field.path)
         lookup_key[field_path] = _eval_expression(state, table_key.field, {})
+        match_kinds[field_path] = table_key.match_kind
+        field_widths[field_path] = _resolve_field_width(state, table_key.field)
 
-    # Find matching entry.
+    # Find matching entry (longest prefix match for LPM fields).
+    best_match = None
+    best_prefix_len = -1
     for entry in entries:
-        if all(entry["key"].get(k) == v for k, v in lookup_key.items()):
-            action_name = entry["action"]
-            action_args = entry.get("args", {})
-            _exec_action_by_name(state, action_name, action_args, ctx)
-            return
+        if _entry_matches(entry, lookup_key, match_kinds, field_widths):
+            # For LPM, pick the entry with the longest prefix.
+            prefix_total = sum(
+                entry.get("prefix_len", {}).get(k, 0) for k in lookup_key
+            )
+            if prefix_total > best_prefix_len:
+                best_match = entry
+                best_prefix_len = prefix_total
+
+    if best_match is not None:
+        _exec_action_by_name(
+            state, best_match["action"], best_match.get("args", {}), ctx
+        )
+        return
 
     # No match — execute default action.
     _exec_action_by_name(state, table.default_action, {}, ctx)
+
+
+def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:
+    """Look up the bit width of a header field."""
+    # field.path is e.g. ("hdr", "ipv4", "dstAddr")
+    header_name = field.path[1]
+    field_name = field.path[2]
+    header_inst = state.headers[header_name]
+    for hf in header_inst.type_info.fields:
+        if hf.name == field_name:
+            return hf.type.width
+    raise ValueError(f"Unknown field: {field}")
+
+
+def _entry_matches(
+    entry: dict,
+    lookup_key: dict[str, int],
+    match_kinds: dict[str, str],
+    field_widths: dict[str, int],
+) -> bool:
+    """Check if a table entry matches the lookup key."""
+    for field_path, value in lookup_key.items():
+        entry_value = entry["key"].get(field_path)
+        if entry_value is None:
+            return False
+        kind = match_kinds.get(field_path, "exact")
+        if kind == "exact":
+            if entry_value != value:
+                return False
+        elif kind == "lpm":
+            prefix_len = entry.get("prefix_len", {}).get(field_path, 0)
+            width = field_widths[field_path]
+            shift = width - prefix_len
+            if (value >> shift) != (entry_value >> shift):
+                return False
+    return True
 
 
 def _exec_action_by_name(

@@ -98,6 +98,7 @@ class _MatchKind:
 
 
 exact = _MatchKind("exact")
+lpm = _MatchKind("lpm")
 
 ACCEPT = "accept"
 REJECT = "reject"

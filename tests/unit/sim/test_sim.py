@@ -140,6 +140,136 @@ class TestSimulator:
         )
         assert result.dropped
 
+    def test_lpm_match(self):
+        """LPM table matches the longest prefix."""
+
+        @p4.parser
+        def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
+            def start():
+                pkt.extract(hdr.ethernet)
+                match hdr.ethernet.etherType:
+                    case 0x0800:
+                        return parse_ipv4
+                    case _:
+                        return p4.ACCEPT
+
+            def parse_ipv4():
+                pkt.extract(hdr.ipv4)
+                return p4.ACCEPT
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            @p4.action
+            def forward(port: p4.bit(9)):
+                std_meta.egress_spec = port
+
+            @p4.action
+            def drop():
+                mark_to_drop(std_meta)
+
+            ipv4_lpm = p4.table(
+                key={hdr.ipv4.dstAddr: p4.lpm},
+                actions=[forward, drop],
+                default_action=drop,
+            )
+
+            if hdr.ipv4.isValid():
+                ipv4_lpm.apply()
+
+        @p4.deparser
+        def MyDeparser(pkt, hdr):
+            pkt.emit(hdr.ethernet)
+            pkt.emit(hdr.ipv4)
+
+        program = compile(
+            V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
+        )
+
+        # 10.0.0.0/8 → port 1, 10.0.0.0/24 → port 2
+        # Packet to 10.0.0.2 should match /24 (longest prefix).
+        table_entries = {
+            "ipv4_lpm": [
+                {
+                    "key": {"hdr.ipv4.dstAddr": 0x0A000000},
+                    "prefix_len": {"hdr.ipv4.dstAddr": 8},
+                    "action": "forward",
+                    "args": {"port": 1},
+                },
+                {
+                    "key": {"hdr.ipv4.dstAddr": 0x0A000000},
+                    "prefix_len": {"hdr.ipv4.dstAddr": 24},
+                    "action": "forward",
+                    "args": {"port": 2},
+                },
+            ],
+        }
+        result = simulate(
+            program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
+        )
+        assert not result.dropped
+        assert result.egress_port == 2
+
+    def test_lpm_no_match(self):
+        """LPM table falls through to default when no prefix matches."""
+
+        @p4.parser
+        def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
+            def start():
+                pkt.extract(hdr.ethernet)
+                match hdr.ethernet.etherType:
+                    case 0x0800:
+                        return parse_ipv4
+                    case _:
+                        return p4.ACCEPT
+
+            def parse_ipv4():
+                pkt.extract(hdr.ipv4)
+                return p4.ACCEPT
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            @p4.action
+            def forward(port: p4.bit(9)):
+                std_meta.egress_spec = port
+
+            @p4.action
+            def drop():
+                mark_to_drop(std_meta)
+
+            ipv4_lpm = p4.table(
+                key={hdr.ipv4.dstAddr: p4.lpm},
+                actions=[forward, drop],
+                default_action=drop,
+            )
+
+            if hdr.ipv4.isValid():
+                ipv4_lpm.apply()
+
+        @p4.deparser
+        def MyDeparser(pkt, hdr):
+            pkt.emit(hdr.ethernet)
+            pkt.emit(hdr.ipv4)
+
+        program = compile(
+            V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
+        )
+
+        # Entry for 192.168.0.0/16, packet goes to 10.0.0.2 — no match.
+        table_entries = {
+            "ipv4_lpm": [
+                {
+                    "key": {"hdr.ipv4.dstAddr": 0xC0A80000},
+                    "prefix_len": {"hdr.ipv4.dstAddr": 16},
+                    "action": "forward",
+                    "args": {"port": 1},
+                },
+            ],
+        }
+        result = simulate(
+            program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
+        )
+        assert result.dropped
+
     def test_drop_non_ipv4(self):
         # Non-IPv4 packet (etherType=0x0806 ARP).
         arp_packet = (
