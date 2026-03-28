@@ -229,5 +229,9 @@ def _emit_field_access(fa: nodes.FieldAccess) -> str:
 def _emit_int_literal(value: int) -> str:
     """Emit an integer literal, using hex for large values."""
     if value > 255:
-        return hex(value)
+        digits = f"{value:x}"
+        # Pad to even number of nibbles (e.g. 0x800 → 0x0800).
+        if len(digits) % 2:
+            digits = "0" + digits
+        return "0x" + digits
     return str(value)
