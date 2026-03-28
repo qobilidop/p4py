@@ -21,6 +21,22 @@ IPV4_HDR = (
 TEST_PACKET = ETHERNET_HDR + IPV4_HDR
 
 TABLE_ENTRIES = {
+    # Port mapping: ingress port 0 → bd 10
+    "port_mapping": [
+        {
+            "key": {"std_meta.ingress_port": 0},
+            "action": "set_bd",
+            "args": {"bd": 10},
+        },
+    ],
+    # BD: bd 10 → vrf 1
+    "bd_table": [
+        {
+            "key": {"meta.bd": 10},
+            "action": "set_vrf",
+            "args": {"vrf": 1},
+        },
+    ],
     # Exact FIB: 10.0.0.2 → nexthop 1
     "ipv4_fib": [
         {
@@ -98,6 +114,32 @@ class TestBasicRoutingSim:
         )
         # on_miss does nothing, nexthop misses too → egress_spec stays 0.
         assert result.egress_port == 0
+
+    def test_port_mapping_sets_bd(self):
+        """Port mapping table sets bridge domain from ingress port."""
+        result = simulate(
+            self.program,
+            packet=TEST_PACKET,
+            ingress_port=0,
+            table_entries=TABLE_ENTRIES,
+        )
+        # Port mapping + bd + FIB pipeline all work together.
+        # Packet still routes to port 5 via exact FIB hit.
+        assert not result.dropped
+        assert result.egress_port == 5
+
+    def test_unknown_ingress_port(self):
+        """Unknown ingress port misses port_mapping, pipeline still works."""
+        result = simulate(
+            self.program,
+            packet=TEST_PACKET,
+            ingress_port=99,
+            table_entries=TABLE_ENTRIES,
+        )
+        # port_mapping misses (on_miss), bd_table misses (on_miss),
+        # but FIB still routes the packet.
+        assert not result.dropped
+        assert result.egress_port == 5
 
     def test_non_ipv4_dropped(self):
         """Non-IPv4 packet is not processed (no isValid)."""

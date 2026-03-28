@@ -29,6 +29,8 @@ struct headers_t {
 
 struct metadata_t {
     bit<16> nexthop_index;
+    bit<16> bd;
+    bit<12> vrf;
 }
 
 parser ParserImpl(packet_in pkt,
@@ -58,6 +60,14 @@ control ingress(inout headers_t hdr,
     action on_miss() {
     }
 
+    action set_bd(bit<16> bd) {
+        meta.bd = bd;
+    }
+
+    action set_vrf(bit<12> vrf) {
+        meta.vrf = vrf;
+    }
+
     action fib_hit_nexthop(bit<16> nexthop_index) {
         meta.nexthop_index = nexthop_index;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
@@ -65,6 +75,28 @@ control ingress(inout headers_t hdr,
 
     action set_egress_details(bit<9> egress_spec) {
         std_meta.egress_spec = egress_spec;
+    }
+
+    table port_mapping {
+        key = {
+            std_meta.ingress_port: exact;
+        }
+        actions = {
+            on_miss;
+            set_bd;
+        }
+        default_action = on_miss();
+    }
+
+    table bd_table {
+        key = {
+            meta.bd: exact;
+        }
+        actions = {
+            on_miss;
+            set_vrf;
+        }
+        default_action = on_miss();
     }
 
     table ipv4_fib {
@@ -101,6 +133,8 @@ control ingress(inout headers_t hdr,
     }
 
     apply {
+        port_mapping.apply();
+        bd_table.apply();
         if (hdr.ipv4.isValid()) {
             switch (ipv4_fib.apply().action_run) {
                 on_miss: {

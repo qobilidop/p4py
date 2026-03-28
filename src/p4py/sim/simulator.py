@@ -224,6 +224,13 @@ def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:
             for member in s.members:
                 if member.name == path[1] and isinstance(member.type, nodes.BitType):
                     return member.type.width
+    # std_meta.field → look up from standard_metadata_t definition
+    if path[0] == "std_meta" and len(path) == 2:
+        from p4py.arch.v1model import standard_metadata_t
+
+        for name, bit_type in standard_metadata_t._p4_fields:
+            if name == path[1]:
+                return bit_type.width
     raise ValueError(f"Cannot resolve field width: {field}")
 
 

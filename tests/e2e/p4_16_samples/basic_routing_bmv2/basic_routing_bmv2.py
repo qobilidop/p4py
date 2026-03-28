@@ -40,6 +40,8 @@ class headers_t(p4.struct):
 
 class metadata_t(p4.struct):
     nexthop_index: p4.bit(16)
+    bd: p4.bit(16)
+    vrf: p4.bit(12)
 
 
 @p4.parser
@@ -63,13 +65,29 @@ def ParserImpl(pkt, hdr: headers_t, meta: metadata_t, std_meta):
 
 @p4.control
 def ingress(hdr, meta, std_meta):
-    # TODO: Add port_mapping table (exact on std_meta.ingress_port → set_bd).
-    # TODO: Add bd table (exact on meta.bd → set_vrf).
-    # Requires: std_meta / meta fields as table keys.
-
     @p4.action
     def on_miss():
         pass
+
+    @p4.action
+    def set_bd(bd: p4.bit(16)):
+        meta.bd = bd
+
+    @p4.action
+    def set_vrf(vrf: p4.bit(12)):
+        meta.vrf = vrf
+
+    port_mapping = p4.table(
+        key={std_meta.ingress_port: p4.exact},
+        actions=[on_miss, set_bd],
+        default_action=on_miss,
+    )
+
+    bd_table = p4.table(
+        key={meta.bd: p4.exact},
+        actions=[on_miss, set_vrf],
+        default_action=on_miss,
+    )
 
     @p4.action
     def fib_hit_nexthop(nexthop_index: p4.bit(16)):
@@ -98,6 +116,8 @@ def ingress(hdr, meta, std_meta):
         default_action=on_miss,
     )
 
+    port_mapping.apply()
+    bd_table.apply()
     if hdr.ipv4.isValid():
         # Try exact FIB first; fall through to LPM on miss.
         match ipv4_fib.apply():
