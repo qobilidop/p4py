@@ -22,13 +22,13 @@ line-length = 88
 
 [tool.ruff.lint]
 select = [
-    "F",     # pyflakes
-    "E",     # pycodestyle errors
-    "W",     # pycodestyle warnings
-    "I",     # isort
-    "N",     # pep8-naming
-    "UP",    # pyupgrade
-    "B",     # flake8-bugbear
-    "SIM",   # flake8-simplify
-    "RUF",   # ruff-specific rules
+  "F", # pyflakes
+  "E", # pycodestyle errors
+  "W", # pycodestyle warnings
+  "I", # isort
+  "N", # pep8-naming
+  "UP", # pyupgrade
+  "B", # flake8-bugbear
+  "SIM", # flake8-simplify
+  "RUF", # ruff-specific rules
 ]
