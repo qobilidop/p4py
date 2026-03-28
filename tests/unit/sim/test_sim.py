@@ -270,6 +270,155 @@ class TestSimulator:
         )
         assert result.dropped
 
+    def test_switch_action_run(self):
+        """Switch on action_run routes to fallback table on miss."""
+
+        @p4.parser
+        def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
+            def start():
+                pkt.extract(hdr.ethernet)
+                match hdr.ethernet.etherType:
+                    case 0x0800:
+                        return parse_ipv4
+                    case _:
+                        return p4.ACCEPT
+
+            def parse_ipv4():
+                pkt.extract(hdr.ipv4)
+                return p4.ACCEPT
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            @p4.action
+            def on_miss():
+                pass
+
+            @p4.action
+            def forward(port: p4.bit(9)):
+                std_meta.egress_spec = port
+
+            # Exact table — miss triggers LPM fallback.
+            ipv4_fib = p4.table(
+                key={hdr.ipv4.dstAddr: p4.exact},
+                actions=[on_miss, forward],
+                default_action=on_miss,
+            )
+
+            ipv4_fib_lpm = p4.table(
+                key={hdr.ipv4.dstAddr: p4.lpm},
+                actions=[on_miss, forward],
+                default_action=on_miss,
+            )
+
+            if hdr.ipv4.isValid():
+                match ipv4_fib.apply():
+                    case "on_miss":
+                        ipv4_fib_lpm.apply()
+
+        @p4.deparser
+        def MyDeparser(pkt, hdr):
+            pkt.emit(hdr.ethernet)
+            pkt.emit(hdr.ipv4)
+
+        program = compile(
+            V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
+        )
+
+        # No exact match entry, but LPM entry matches → forward to port 3.
+        table_entries = {
+            "ipv4_fib_lpm": [
+                {
+                    "key": {"hdr.ipv4.dstAddr": 0x0A000000},
+                    "prefix_len": {"hdr.ipv4.dstAddr": 8},
+                    "action": "forward",
+                    "args": {"port": 3},
+                },
+            ],
+        }
+        result = simulate(
+            program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
+        )
+        assert not result.dropped
+        assert result.egress_port == 3
+
+    def test_switch_action_run_hit(self):
+        """Switch on action_run skips fallback when action matches."""
+
+        @p4.parser
+        def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
+            def start():
+                pkt.extract(hdr.ethernet)
+                match hdr.ethernet.etherType:
+                    case 0x0800:
+                        return parse_ipv4
+                    case _:
+                        return p4.ACCEPT
+
+            def parse_ipv4():
+                pkt.extract(hdr.ipv4)
+                return p4.ACCEPT
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            @p4.action
+            def on_miss():
+                pass
+
+            @p4.action
+            def forward(port: p4.bit(9)):
+                std_meta.egress_spec = port
+
+            ipv4_fib = p4.table(
+                key={hdr.ipv4.dstAddr: p4.exact},
+                actions=[on_miss, forward],
+                default_action=on_miss,
+            )
+
+            ipv4_fib_lpm = p4.table(
+                key={hdr.ipv4.dstAddr: p4.lpm},
+                actions=[on_miss, forward],
+                default_action=on_miss,
+            )
+
+            if hdr.ipv4.isValid():
+                match ipv4_fib.apply():
+                    case "on_miss":
+                        ipv4_fib_lpm.apply()
+
+        @p4.deparser
+        def MyDeparser(pkt, hdr):
+            pkt.emit(hdr.ethernet)
+            pkt.emit(hdr.ipv4)
+
+        program = compile(
+            V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
+        )
+
+        # Exact match hits → forward to port 5. LPM entry exists but should
+        # NOT be used because ipv4_fib matched.
+        table_entries = {
+            "ipv4_fib": [
+                {
+                    "key": {"hdr.ipv4.dstAddr": 0x0A000002},
+                    "action": "forward",
+                    "args": {"port": 5},
+                },
+            ],
+            "ipv4_fib_lpm": [
+                {
+                    "key": {"hdr.ipv4.dstAddr": 0x0A000000},
+                    "prefix_len": {"hdr.ipv4.dstAddr": 8},
+                    "action": "forward",
+                    "args": {"port": 3},
+                },
+            ],
+        }
+        result = simulate(
+            program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
+        )
+        assert not result.dropped
+        assert result.egress_port == 5
+
     def test_drop_non_ipv4(self):
         # Non-IPv4 packet (etherType=0x0806 ARP).
         arp_packet = (

@@ -108,7 +108,27 @@ class IfElse:
     else_body: tuple[Statement, ...]
 
 
-Statement = Assignment | MethodCall | FunctionCall | ActionCall | TableApply | IfElse
+@dataclass(frozen=True)
+class SwitchActionCase:
+    action_name: str
+    body: tuple[Statement, ...]
+
+
+@dataclass(frozen=True)
+class SwitchAction:
+    table_name: str
+    cases: tuple[SwitchActionCase, ...]
+
+
+Statement = (
+    Assignment
+    | MethodCall
+    | FunctionCall
+    | ActionCall
+    | TableApply
+    | IfElse
+    | SwitchAction
+)
 
 
 # --- Parser ---

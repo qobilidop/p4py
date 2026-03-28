@@ -158,14 +158,21 @@ def _exec_control_statement(
         else:
             for s in stmt.else_body:
                 _exec_control_statement(state, s, ctx)
+    elif isinstance(stmt, nodes.SwitchAction):
+        action_run = _exec_table_apply(state, stmt.table_name, ctx)
+        for case in stmt.cases:
+            if case.action_name == action_run:
+                for s in case.body:
+                    _exec_control_statement(state, s, ctx)
+                break
     elif isinstance(stmt, nodes.FunctionCall):
         _exec_action_by_name(state, stmt.name, {}, ctx)
     else:
         raise ValueError(f"Unsupported control statement: {stmt}")
 
 
-def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -> None:
-    """Look up a table entry and execute the matching action."""
+def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -> str:
+    """Look up a table entry, execute the matching action, return action name."""
     table = ctx.tables[table_name]
     entries = ctx.entries.get(table_name, [])
 
@@ -193,13 +200,13 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
                 best_prefix_len = prefix_total
 
     if best_match is not None:
-        _exec_action_by_name(
-            state, best_match["action"], best_match.get("args", {}), ctx
-        )
-        return
+        action_name = best_match["action"]
+        _exec_action_by_name(state, action_name, best_match.get("args", {}), ctx)
+        return action_name
 
     # No match — execute default action.
     _exec_action_by_name(state, table.default_action, {}, ctx)
+    return table.default_action
 
 
 def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:

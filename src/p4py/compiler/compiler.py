@@ -134,6 +134,29 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
             condition=condition, then_body=then_body, else_body=else_body
         )
 
+    # match table.apply(): case "action": ... → SwitchAction
+    if isinstance(node, ast.Match):
+        subject = node.subject
+        if (
+            isinstance(subject, ast.Call)
+            and isinstance(subject.func, ast.Attribute)
+            and subject.func.attr == "apply"
+        ):
+            table_name = subject.func.value.id
+            cases = []
+            for case in node.cases:
+                if isinstance(case.pattern, ast.MatchValue):
+                    action_name = case.pattern.value.value
+                    body = tuple(
+                        s
+                        for n in case.body
+                        if (s := _ast_to_statement(n, params)) is not None
+                    )
+                    cases.append(
+                        nodes.SwitchActionCase(action_name=action_name, body=body)
+                    )
+            return nodes.SwitchAction(table_name=table_name, cases=tuple(cases))
+
     # pass → empty body (e.g., no-op actions)
     if isinstance(node, ast.Pass):
         return None

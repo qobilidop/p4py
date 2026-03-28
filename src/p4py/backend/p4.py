@@ -189,6 +189,14 @@ def _emit_block_statement(lines: list[str], stmt: nodes.Statement, indent: int) 
             for s in stmt.else_body:
                 _emit_block_statement(lines, s, indent + 4)
         lines.append(f"{pad}}}")
+    elif isinstance(stmt, nodes.SwitchAction):
+        lines.append(f"{pad}switch ({stmt.table_name}.apply().action_run) {{")
+        for case in stmt.cases:
+            lines.append(f"{pad}    {case.action_name}: {{")
+            for s in case.body:
+                _emit_block_statement(lines, s, indent + 8)
+            lines.append(f"{pad}    }}")
+        lines.append(f"{pad}}}")
     else:
         lines.append(f"{pad}{_emit_statement(stmt)}")
 
