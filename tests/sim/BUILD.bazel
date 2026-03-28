@@ -1,0 +1,7 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "test_sim",
+    srcs = ["test_sim.py"],
+    deps = ["//src/p4py"],
+)
