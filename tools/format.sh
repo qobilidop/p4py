@@ -6,8 +6,8 @@ cd "$(git rev-parse --show-toplevel)"
 
 py_files=$(find src tests -name '*.py' 2>/dev/null || true)
 bzl_files=$(find . -name '*.bazel' -o -name '*.bzl' -o -name 'BUILD' |
-  grep -v -e '.git/' -e './site/')
-sh_files=$(find . -name '*.sh' -not -path './.git/*' -not -path './site/*')
+  grep -v -e '.git/' -e './docs/_build/')
+sh_files=$(find . -name '*.sh' -not -path './.git/*' -not -path './docs/_build/*')
 
 if [[ "${1:-}" == "--check" ]]; then
   fail=0

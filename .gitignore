@@ -19,8 +19,8 @@ dist/
 # ruff
 .ruff_cache/
 
-# MkDocs
-/site/
+# Sphinx
+/docs/_build/
 
 # Superpowers
 /docs/superpowers/

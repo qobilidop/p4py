@@ -44,8 +44,10 @@ RUN DPRINT_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64"
 
 # Install Python packages.
 RUN pip install --break-system-packages \
-    mkdocs-material \
-    mkdocs-include-markdown-plugin \
+    furo \
+    myst-parser \
+    sphinx \
+    sphinx-autobuild \
     pytest \
     ruff
 

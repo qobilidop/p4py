@@ -10,11 +10,11 @@ echo "ruff: all checks passed."
 
 # --- Bazel ---
 bzl_files=$(find . -name '*.bazel' -o -name '*.bzl' -o -name 'BUILD' |
-  grep -v -e '.git/' -e './site/')
+  grep -v -e '.git/' -e './docs/_build/')
 echo "$bzl_files" | xargs --no-run-if-empty buildifier -lint=warn
 echo "buildifier: all checks passed."
 
 # --- Shell ---
-sh_files=$(find . -name '*.sh' -not -path './.git/*' -not -path './site/*')
+sh_files=$(find . -name '*.sh' -not -path './.git/*' -not -path './docs/_build/*')
 echo "$sh_files" | xargs --no-run-if-empty shellcheck
 echo "shellcheck: all checks passed."

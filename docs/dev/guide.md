@@ -92,6 +92,9 @@ To check without modifying (used in CI):
 
 ## Doc style
 
+- We use [Sphinx](https://www.sphinx-doc.org/) with
+    [MyST-Parser](https://myst-parser.readthedocs.io/) (Markdown) and the
+    [Furo](https://pradyunsg.me/furo/) theme.
 - Follow
     [Google Markdown Style Guide](https://google.github.io/styleguide/docguide/style.html).
 - For titles, use Title Case.
