@@ -11,3 +11,11 @@ P4Py lets you compose, simulate, and compile P4 programs using Python.
 ```python
 import p4py
 ```
+
+```{toctree}
+:maxdepth: 2
+
+roadmap
+architecture
+dev/guide
+```
