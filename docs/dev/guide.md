@@ -12,8 +12,8 @@ CI.
 - [Docker](https://www.docker.com/)
 - [Dev Container CLI](https://github.com/devcontainers/cli)
 - (Optional) An IDE with dev container support, e.g.
-    [VS Code](https://code.visualstudio.com/) with the
-    [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+  [VS Code](https://code.visualstudio.com/) with the
+  [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 - All other dependencies are installed in the dev container.
 
 ### Dev container setup
@@ -83,7 +83,7 @@ To check without modifying (used in CI):
 ### Python
 
 - Follow
-    [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html).
+  [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html).
 - Use [ruff](https://docs.astral.sh/ruff/) for formatting and linting.
 
 ### Bazel
@@ -93,10 +93,10 @@ To check without modifying (used in CI):
 ## Doc style
 
 - We use [Sphinx](https://www.sphinx-doc.org/) with
-    [MyST-Parser](https://myst-parser.readthedocs.io/) (Markdown) and the
-    [Furo](https://pradyunsg.me/furo/) theme.
+  [MyST-Parser](https://myst-parser.readthedocs.io/) (Markdown) and the
+  [Furo](https://pradyunsg.me/furo/) theme.
 - Follow
-    [Google Markdown Style Guide](https://google.github.io/styleguide/docguide/style.html).
+  [Google Markdown Style Guide](https://google.github.io/styleguide/docguide/style.html).
 - For titles, use Title Case.
 - For non-title section headings, use Sentence case.
 - Use plain hyphens (-) instead of em dashes.
@@ -121,8 +121,8 @@ Before commit, ALWAYS run the following commands and fix any issues you see:
 - Keep the subject line under 72 characters.
 - Explain why the change is being made.
 - Describe what has changed at a high level. Don't repeat what's obvious in the
-    change itself.
+  change itself.
 - Prefer one commit per logical change. Don't split into too many tiny commits
-    when they form a single unit of work.
+  when they form a single unit of work.
 - For agents: credit yourself (e.g. using `Co-authored-by:`) for commits you
-    made.
+  made.

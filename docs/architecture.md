@@ -23,8 +23,8 @@ program structure — including all branches of `transition select` — in one p
 The alternative, tracing (executing with proxy objects), would only see one
 execution path per run, making it unsuited for capturing parser state machines.
 
-The restriction on Python features inside decorated functions is a feature, not a
-bug — it ensures user code maps cleanly to P4 constructs.
+The restriction on Python features inside decorated functions is a feature, not
+a bug — it ensures user code maps cleanly to P4 constructs.
 
 ## Components
 
@@ -59,6 +59,6 @@ v1model stages. Output can be compiled by `p4c` and run on BMv2.
 
 ### Externs (`@p4py.extern`)
 
-Python-defined P4 externs with an extern registry. The simulator calls the Python
-implementation directly. The P4 emitter generates `extern` declarations. Scoped
-to P4Lite.
+Python-defined P4 externs with an extern registry. The simulator calls the
+Python implementation directly. The P4 emitter generates `extern` declarations.
+Scoped to P4Lite.

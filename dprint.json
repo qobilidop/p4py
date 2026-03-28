@@ -7,7 +7,6 @@
   "yaml": {},
   "toml": {},
   "excludes": [
-    "docs/",
     ".git/"
   ],
   "plugins": [
