@@ -45,6 +45,9 @@ RUN DPRINT_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64"
     chmod +x /usr/local/bin/dprint && \
     rm /tmp/dprint.zip
 
+# Install uv (Python package manager).
+RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+
 # Install Python packages.
 RUN pip install --break-system-packages \
     furo \
@@ -61,5 +64,9 @@ RUN useradd -m dev && \
 
 # Trust /workspace for git operations.
 RUN git config --system --add safe.directory /workspace
+
+# Set clang as the default C/C++ compiler for Bazel.
+ENV CC=clang
+ENV CXX=clang++
 
 USER dev
