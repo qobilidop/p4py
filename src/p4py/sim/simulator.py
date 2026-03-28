@@ -210,15 +210,21 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
 
 
 def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:
-    """Look up the bit width of a header field."""
-    # field.path is e.g. ("hdr", "ipv4", "dstAddr")
-    header_name = field.path[1]
-    field_name = field.path[2]
-    header_inst = state.headers[header_name]
-    for hf in header_inst.type_info.fields:
-        if hf.name == field_name:
-            return hf.type.width
-    raise ValueError(f"Unknown field: {field}")
+    """Look up the bit width of a header or metadata field."""
+    path = field.path
+    # hdr.header.field → look up from header type info
+    if path[0] == "hdr" and len(path) == 3:
+        header_inst = state.headers[path[1]]
+        for hf in header_inst.type_info.fields:
+            if hf.name == path[2]:
+                return hf.type.width
+    # meta.field → look up from program struct definitions
+    if path[0] == "meta" and len(path) == 2:
+        for s in state.program.structs:
+            for member in s.members:
+                if member.name == path[1] and isinstance(member.type, nodes.BitType):
+                    return member.type.width
+    raise ValueError(f"Cannot resolve field width: {field}")
 
 
 def _entry_matches(
