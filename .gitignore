@@ -1,0 +1,31 @@
+# Bazel
+/bazel-*
+/.bazel-disk-cache/
+MODULE.bazel.lock
+
+# Bazel CI config (written by CI workflow, contains API key).
+/ci.bazelrc
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+*.egg
+
+# pytest
+.pytest_cache/
+
+# ruff
+.ruff_cache/
+
+# MkDocs
+/site/
+
+# Superpowers
+/docs/superpowers/
+
+# IDE
+.idea/
+.vscode/
+*.swp

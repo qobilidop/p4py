@@ -6,6 +6,8 @@ A Python eDSL for P4 network programming.
 
 P4Py lets you compose, simulate, and compile P4 programs using Python.
 
-## License
+## Quick start
 
-Apache License 2.0. See [LICENSE](LICENSE) for details.
+```python
+import p4py
+```

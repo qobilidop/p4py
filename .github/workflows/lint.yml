@@ -1,0 +1,27 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Format check
+        uses: devcontainers/ci@v0.3
+        with:
+          cacheFrom: ghcr.io/qobilidop/p4py-dev
+          push: never
+          runCmd: ./tools/format.sh --check
+
+      - name: Lint check
+        uses: devcontainers/ci@v0.3
+        with:
+          cacheFrom: ghcr.io/qobilidop/p4py-dev
+          push: never
+          runCmd: ./tools/lint.sh

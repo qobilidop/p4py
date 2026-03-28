@@ -1,0 +1,5 @@
+# Set up disk cache for faster local rebuilds.
+build --disk_cache=.bazel-disk-cache
+
+# Activate CI-specific config using ci.bazelrc, which is written when in CI.
+try-import %workspace%/ci.bazelrc
