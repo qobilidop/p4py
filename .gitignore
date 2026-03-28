@@ -1,3 +1,6 @@
+# Agent
+/.agent_workspace/
+
 # Bazel
 /bazel-*
 /.bazel-disk-cache/
@@ -8,12 +11,12 @@ MODULE.bazel.lock
 
 # Python
 __pycache__/
-.venv/
-uv.lock
 *.py[cod]
 *.egg-info/
-dist/
 *.egg
+dist/
+.venv/
+uv.lock
 
 # pytest
 .pytest_cache/
@@ -23,12 +26,6 @@ dist/
 
 # Sphinx
 /docs/_build/
-
-# Superpowers
-/docs/superpowers/
-
-# Worktrees
-/.worktrees/
 
 # IDE
 .idea/
