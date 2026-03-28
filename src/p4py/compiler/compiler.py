@@ -45,11 +45,13 @@ def _compile_structs(
     """Compile struct types to IR."""
     result = []
     for s in (headers_struct, metadata_struct):
-        members = tuple(
-            nodes.StructMember(name, hdr_cls._p4_name)
-            for name, hdr_cls in s._p4_members
-        )
-        result.append(nodes.StructType(name=s._p4_name, members=members))
+        members = []
+        for name, ann in s._p4_members:
+            if hasattr(ann, "width"):
+                members.append(nodes.StructMember(name, nodes.BitType(ann.width)))
+            else:
+                members.append(nodes.StructMember(name, ann._p4_name))
+        result.append(nodes.StructType(name=s._p4_name, members=tuple(members)))
     return tuple(result)
 
 
@@ -122,11 +124,19 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
         condition = _ast_to_expression(node.test)
         if not isinstance(condition, nodes.IsValid):
             raise ValueError("if conditions must be hdr.x.isValid()")
-        then_body = tuple(_ast_to_statement(s, params) for s in node.body)
-        else_body = tuple(_ast_to_statement(s, params) for s in node.orelse)
+        then_body = tuple(
+            s for n in node.body if (s := _ast_to_statement(n, params)) is not None
+        )
+        else_body = tuple(
+            s for n in node.orelse if (s := _ast_to_statement(n, params)) is not None
+        )
         return nodes.IfElse(
             condition=condition, then_body=then_body, else_body=else_body
         )
+
+    # pass → empty body (e.g., no-op actions)
+    if isinstance(node, ast.Pass):
+        return None
 
     raise ValueError(f"Unsupported statement: {ast.dump(node)}")
 
@@ -309,7 +319,11 @@ def _compile_action(
                     f"Action param '{arg.arg}' must be annotated with p4.bit(W)"
                 )
 
-    body = tuple(_ast_to_statement(node, block_params) for node in func_def.body)
+    body = tuple(
+        s
+        for node in func_def.body
+        if (s := _ast_to_statement(node, block_params)) is not None
+    )
     return nodes.ActionDecl(name=func_def.name, params=tuple(action_params), body=body)
 
 

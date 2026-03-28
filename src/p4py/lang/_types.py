@@ -62,24 +62,31 @@ class header:
 class struct:
     """Base class for P4 struct types.
 
-    Subclass and annotate members with header subclasses:
+    Subclass and annotate members with header subclasses or bit<W> types:
 
         class headers_t(struct):
             ethernet: ethernet_t
             ipv4: ipv4_t
 
-    Empty structs (e.g., metadata) are allowed.
+        class metadata_t(struct):
+            vrf: p4.bit(12)
+
+    Empty structs are allowed.
     """
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        members: list[tuple[str, type]] = []
+        members: list[tuple[str, type | BitType]] = []
         for name, ann in cls.__annotations__.items():
-            if not (isinstance(ann, type) and issubclass(ann, header)):
+            if isinstance(ann, BitType) or (
+                isinstance(ann, type) and issubclass(ann, header)
+            ):
+                members.append((name, ann))
+            else:
                 raise TypeError(
-                    f"Struct member '{name}' must be a header subclass, got {ann!r}"
+                    f"Struct member '{name}' must be a header subclass or bit<W>,"
+                    f" got {ann!r}"
                 )
-            members.append((name, ann))
         cls._p4_name = cls.__name__
         cls._p4_members = tuple(members)
 

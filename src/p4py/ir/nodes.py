@@ -31,7 +31,7 @@ class HeaderType:
 @dataclass(frozen=True)
 class StructMember:
     name: str
-    header_type_name: str
+    type: BitType | str  # BitType for bit<W> fields, str for header type name
 
 
 @dataclass(frozen=True)

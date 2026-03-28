@@ -56,21 +56,25 @@ def simulate(
     if table_entries is None:
         table_entries = {}
 
-    # Initialize header instances.
+    # Initialize header instances and metadata fields from struct definitions.
     headers: dict[str, _HeaderInstance] = {}
+    metadata: dict[str, int] = {}
     header_types = {h.name: h for h in program.headers}
     for s in program.structs:
-        if s.name.endswith("_t") and s.members:
-            for member in s.members:
+        for member in s.members:
+            if isinstance(member.type, nodes.BitType):
+                # Metadata field — initialize to zero.
+                metadata[member.name] = 0
+            elif isinstance(member.type, str) and member.type in header_types:
                 headers[member.name] = _HeaderInstance(
-                    type_info=header_types[member.header_type_name]
+                    type_info=header_types[member.type]
                 )
 
     state = _SimState(
         packet_bytes=bytearray(packet),
         cursor=0,
         headers=headers,
-        metadata={},
+        metadata=metadata,
         std_meta={"ingress_port": ingress_port, "egress_spec": 0},
         program=program,
     )
@@ -349,6 +353,9 @@ def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int])
     # std_meta.field
     if path[0] == "std_meta":
         return state.std_meta[path[1]]
+    # meta.field
+    if path[0] == "meta":
+        return state.metadata[path[1]]
     # hdr.header.field
     if path[0] == "hdr" and len(path) == 3:
         return state.headers[path[1]].fields[path[2]]
@@ -360,6 +367,8 @@ def _set_field(state: _SimState, fa: nodes.FieldAccess, value: int) -> None:
     path = fa.path
     if path[0] == "std_meta":
         state.std_meta[path[1]] = value
+    elif path[0] == "meta":
+        state.metadata[path[1]] = value
     elif path[0] == "hdr" and len(path) == 3:
         state.headers[path[1]].fields[path[2]] = value
     else:

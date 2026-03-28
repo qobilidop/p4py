@@ -25,7 +25,16 @@ class TestStruct:
 
         assert metadata_t._p4_members == ()
 
-    def test_non_header_annotation_rejected(self):
+    def test_bit_field_members(self):
+        class meta_t(p4.struct):
+            vrf: p4.bit(12)
+            bd: p4.bit(16)
+
+        assert len(meta_t._p4_members) == 2
+        assert meta_t._p4_members[0] == ("vrf", p4.bit(12))
+        assert meta_t._p4_members[1] == ("bd", p4.bit(16))
+
+    def test_non_header_non_bit_annotation_rejected(self):
         try:
 
             class bad_t(p4.struct):
@@ -33,4 +42,4 @@ class TestStruct:
 
             raise AssertionError("Expected TypeError")
         except TypeError as e:
-            assert "header" in str(e).lower()
+            assert "header" in str(e).lower() or "bit" in str(e).lower()

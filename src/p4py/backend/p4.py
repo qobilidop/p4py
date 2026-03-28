@@ -43,7 +43,10 @@ def _emit_header(lines: list[str], h: nodes.HeaderType) -> None:
 def _emit_struct(lines: list[str], s: nodes.StructType) -> None:
     lines.append(f"struct {s.name} {{")
     for member in s.members:
-        lines.append(f"    {member.header_type_name} {member.name};")
+        if isinstance(member.type, nodes.BitType):
+            lines.append(f"    bit<{member.type.width}> {member.name};")
+        else:
+            lines.append(f"    {member.type} {member.name};")
     lines.append("}")
     lines.append("")
 
