@@ -1,0 +1,11 @@
+# basic_forward.stf - Test L2 forwarding with exact match.
+
+# Install a forwarding entry: dstAddr 00:00:00:00:00:01 -> port 2.
+add MyIngress.mac_table MyIngress.forward(port:2) hdr.ethernet.dstAddr:0x000000000001
+
+# Send a packet on port 1. Ethernet frame: dst=00:00:00:00:00:01,
+# src=00:00:00:00:00:02, etherType=0x0800.
+packet 1 000000000001 000000000002 0800
+
+# Expect the same packet on port 2 (forwarded).
+expect 2 000000000001 000000000002 0800
