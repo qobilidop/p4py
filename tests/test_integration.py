@@ -50,7 +50,7 @@ class metadata_t(struct):
 
 
 @p4.parser
-def MyParser(pkt, hdr, meta, std_meta):
+def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
     def start():
         pkt.extract(hdr.ethernet)
         match hdr.ethernet.etherType:
@@ -94,8 +94,6 @@ def MyDeparser(pkt, hdr):
 
 
 main = V1SwitchMini(
-    headers=headers_t,
-    metadata=metadata_t,
     parser=MyParser,
     ingress=MyIngress,
     deparser=MyDeparser,

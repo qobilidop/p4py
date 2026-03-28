@@ -17,6 +17,20 @@ class TestLangSurface:
         assert MyParser._p4_kind == "parser"
         assert MyParser._p4_name == "MyParser"
 
+    def test_parser_decorator_captures_annotations(self):
+        class my_hdrs(struct):
+            pass
+
+        class my_meta(struct):
+            pass
+
+        @p4.parser
+        def MyParser(pkt, hdr: my_hdrs, meta: my_meta, std_meta):
+            def start():
+                return p4.ACCEPT
+
+        assert MyParser._p4_annotations == {"hdr": my_hdrs, "meta": my_meta}
+
     def test_control_decorator_returns_spec(self):
         @p4.control
         def MyIngress(hdr, meta, std_meta):
@@ -72,7 +86,7 @@ class TestV1SwitchMini:
             pass
 
         @p4.parser
-        def P(pkt, hdr, meta, std_meta):
+        def P(pkt, hdr: hdrs_t, meta: meta_t, std_meta):
             def start():
                 return p4.ACCEPT
 
@@ -85,8 +99,6 @@ class TestV1SwitchMini:
             pass
 
         pipeline = V1SwitchMini(
-            headers=hdrs_t,
-            metadata=meta_t,
             parser=P,
             ingress=I,
             deparser=D,

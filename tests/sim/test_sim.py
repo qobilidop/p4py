@@ -41,7 +41,7 @@ class metadata_t(struct):
 
 def _make_ipv4_forwarder():
     @p4.parser
-    def MyParser(pkt, hdr, meta, std_meta):
+    def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
         def start():
             pkt.extract(hdr.ethernet)
             match hdr.ethernet.etherType:
@@ -82,8 +82,6 @@ def _make_ipv4_forwarder():
         pkt.emit(hdr.ipv4)
 
     pipeline = V1SwitchMini(
-        headers=headers_t,
-        metadata=metadata_t,
         parser=MyParser,
         ingress=MyIngress,
         deparser=MyDeparser,

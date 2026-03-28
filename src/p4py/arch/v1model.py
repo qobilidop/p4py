@@ -38,12 +38,19 @@ mark_to_drop = _Extern("mark_to_drop")
 class V1SwitchMini:
     """Simplified v1model pipeline: Parser, Ingress, Deparser.
 
+    Header and metadata types are inferred from the parser's type
+    annotations (``hdr`` and ``meta`` parameters), matching how the
+    real v1model architecture works.
+
     The P4-16 emitter expands this to the full V1Switch with empty
     VerifyChecksum, Egress, and ComputeChecksum blocks.
     """
 
-    headers: "type[struct_cls]"
-    metadata: "type[struct_cls]"
     parser: "_Spec"
     ingress: "_Spec"
     deparser: "_Spec"
+
+    def __post_init__(self) -> None:
+        annotations = self.parser._p4_annotations
+        self.headers: type[struct_cls] = annotations["hdr"]
+        self.metadata: type[struct_cls] = annotations["meta"]

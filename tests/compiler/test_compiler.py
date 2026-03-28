@@ -42,7 +42,7 @@ class metadata_t(struct):
 
 def _dummy_parser():
     @p4.parser
-    def P(pkt, hdr, meta, std_meta):
+    def P(pkt, hdr: headers_t, meta: metadata_t, std_meta):
         def start():
             return p4.ACCEPT
 
@@ -68,14 +68,12 @@ def _dummy_deparser():
 class TestCompileParser:
     def test_simple_parser_with_transition(self):
         @p4.parser
-        def MyParser(pkt, hdr, meta, std_meta):
+        def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
             def start():
                 pkt.extract(hdr.ethernet)
                 return p4.ACCEPT
 
         pipeline = V1SwitchMini(
-            headers=headers_t,
-            metadata=metadata_t,
             parser=MyParser,
             ingress=_dummy_ingress(),
             deparser=_dummy_deparser(),
@@ -96,7 +94,7 @@ class TestCompileParser:
 
     def test_parser_with_transition_select(self):
         @p4.parser
-        def MyParser(pkt, hdr, meta, std_meta):
+        def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
             def start():
                 pkt.extract(hdr.ethernet)
                 match hdr.ethernet.etherType:
@@ -110,8 +108,6 @@ class TestCompileParser:
                 return p4.ACCEPT
 
         pipeline = V1SwitchMini(
-            headers=headers_t,
-            metadata=metadata_t,
             parser=MyParser,
             ingress=_dummy_ingress(),
             deparser=_dummy_deparser(),
@@ -163,8 +159,6 @@ class TestCompileControl:
                 drop()
 
         pipeline = V1SwitchMini(
-            headers=headers_t,
-            metadata=metadata_t,
             parser=_dummy_parser(),
             ingress=MyIngress,
             deparser=_dummy_deparser(),
@@ -216,8 +210,6 @@ class TestCompileDeparser:
             pkt.emit(hdr.ipv4)
 
         pipeline = V1SwitchMini(
-            headers=headers_t,
-            metadata=metadata_t,
             parser=_dummy_parser(),
             ingress=_dummy_ingress(),
             deparser=MyDeparser,
@@ -234,7 +226,7 @@ class TestCompileDeparser:
 class TestCompileProgram:
     def test_full_program_types(self):
         @p4.parser
-        def P(pkt, hdr, meta, std_meta):
+        def P(pkt, hdr: headers_t, meta: metadata_t, std_meta):
             def start():
                 return p4.ACCEPT
 
@@ -247,8 +239,6 @@ class TestCompileProgram:
             pass
 
         pipeline = V1SwitchMini(
-            headers=headers_t,
-            metadata=metadata_t,
             parser=P,
             ingress=I,
             deparser=D,

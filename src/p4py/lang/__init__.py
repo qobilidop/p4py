@@ -15,16 +15,24 @@ from p4py.lang.struct import struct
 class _Spec:
     """A captured P4 block (parser, control, or deparser)."""
 
-    def __init__(self, kind: str, name: str, source: str) -> None:
+    def __init__(
+        self, kind: str, name: str, source: str, annotations: dict
+    ) -> None:
         self._p4_kind = kind
         self._p4_name = name
         self._p4_source = source
+        self._p4_annotations = annotations
 
 
 def _make_decorator(kind: str):
     def decorator(func):
         source = textwrap.dedent(inspect.getsource(func))
-        return _Spec(kind=kind, name=func.__name__, source=source)
+        annotations = {
+            k: v for k, v in func.__annotations__.items() if k != "return"
+        }
+        return _Spec(
+            kind=kind, name=func.__name__, source=source, annotations=annotations
+        )
 
     return decorator
 
