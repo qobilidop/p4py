@@ -9,16 +9,15 @@ import os
 import subprocess
 import tempfile
 
+from p4py.backend.p4 import emit
+from p4py.compiler import compile
+from p4py.sim import simulate
+from tests.e2e.basic_forward.basic_forward import main
 from tests.infra.stf_runner import (
     match_hex,
     run_stf_test,
     stf_to_sim_inputs,
 )
-
-from examples.basic_forward.basic_forward import main
-from p4py.backend.p4 import emit
-from p4py.compiler import compile
-from p4py.sim import simulate
 
 
 def _run_p4testgen(p4_path: str, out_dir: str) -> list[str]:
@@ -26,11 +25,16 @@ def _run_p4testgen(p4_path: str, out_dir: str) -> list[str]:
     result = subprocess.run(
         [
             "p4testgen",
-            "--target", "bmv2",
-            "--arch", "v1model",
-            "--test-backend", "stf",
-            "--max-tests", "0",
-            "--out-dir", out_dir,
+            "--target",
+            "bmv2",
+            "--arch",
+            "v1model",
+            "--test-backend",
+            "stf",
+            "--max-tests",
+            "0",
+            "--out-dir",
+            out_dir,
             p4_path,
         ],
         capture_output=True,
@@ -39,9 +43,7 @@ def _run_p4testgen(p4_path: str, out_dir: str) -> list[str]:
     if result.returncode != 0:
         raise RuntimeError(f"p4testgen failed:\n{result.stderr}")
     stf_files = sorted(
-        os.path.join(out_dir, f)
-        for f in os.listdir(out_dir)
-        if f.endswith(".stf")
+        os.path.join(out_dir, f) for f in os.listdir(out_dir) if f.endswith(".stf")
     )
     return stf_files
 
@@ -82,9 +84,7 @@ class TestBasicForwardTestgen:
                     if result.dropped:
                         sim_results.append((-1, None))
                     else:
-                        sim_results.append(
-                            (result.egress_port, result.packet.hex())
-                        )
+                        sim_results.append((result.egress_port, result.packet.hex()))
 
                 # Verify simulator against STF expectations.
                 if sim_inputs.expects:

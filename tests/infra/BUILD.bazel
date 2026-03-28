@@ -2,13 +2,19 @@ load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 exports_files(
     ["stf_runner.py"],
-    visibility = ["//examples:__subpackages__"],
+    visibility = [
+        "//examples:__subpackages__",
+        "//tests:__subpackages__",
+    ],
 )
 
 py_library(
     name = "stf_runner",
     srcs = ["stf_runner.py"],
-    visibility = ["//examples:__subpackages__"],
+    visibility = [
+        "//examples:__subpackages__",
+        "//tests:__subpackages__",
+    ],
 )
 
 py_test(

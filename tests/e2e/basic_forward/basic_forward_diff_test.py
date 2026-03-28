@@ -7,16 +7,15 @@ the Python simulator and BMv2 simple_switch, and asserts matching output.
 import os
 import tempfile
 
+from p4py.backend.p4 import emit
+from p4py.compiler import compile
+from p4py.sim import simulate
+from tests.e2e.basic_forward.basic_forward import main
 from tests.infra.stf_runner import (
     match_hex,
     run_stf_test,
     stf_to_sim_inputs,
 )
-
-from examples.basic_forward.basic_forward import main
-from p4py.backend.p4 import emit
-from p4py.compiler import compile
-from p4py.sim import simulate
 
 _HERE = os.path.dirname(__file__)
 _STF_PATH = os.path.join(_HERE, "basic_forward.stf")
@@ -45,19 +44,14 @@ class TestBasicForwardDiff:
             if result.dropped:
                 sim_results.append((-1, None))
             else:
-                sim_results.append(
-                    (result.egress_port, result.packet.hex())
-                )
+                sim_results.append((result.egress_port, result.packet.hex()))
 
         # Verify simulator against STF expectations.
         assert len(sim_results) == len(sim_inputs.expects)
-        for (egress_port, pkt_hex), expect in zip(
-            sim_results, sim_inputs.expects
-        ):
+        for (egress_port, pkt_hex), expect in zip(sim_results, sim_inputs.expects):
             if expect.pattern is not None:
                 assert egress_port == expect.port, (
-                    f"Simulator: expected port {expect.port},"
-                    f" got {egress_port}"
+                    f"Simulator: expected port {expect.port}, got {egress_port}"
                 )
                 assert pkt_hex is not None, "Simulator: packet was dropped"
                 assert match_hex(pkt_hex, expect.pattern), (
