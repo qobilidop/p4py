@@ -5,19 +5,14 @@ and V1Switch pipeline.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-from p4py.lang.bit import bit
-from p4py.lang.header import header
-
-if TYPE_CHECKING:
-    from p4py.lang import _Spec
-    from p4py.lang.struct import struct as struct_cls
+import p4py.lang as p4
+from p4py.lang import _Spec
 
 
-class standard_metadata_t(header):
-    ingress_port: bit(9)
-    egress_spec: bit(9)
+class standard_metadata_t(p4.header):
+    ingress_port: p4.bit(9)
+    egress_spec: p4.bit(9)
 
 
 class _Extern:
@@ -46,18 +41,15 @@ class V1Switch:
     to None; the P4-16 emitter produces empty apply blocks for them.
     """
 
-    parser: "_Spec"
-    verify_checksum: "_Spec | None" = None
-    ingress: "_Spec | None" = None
-    egress: "_Spec | None" = None
-    compute_checksum: "_Spec | None" = None
-    deparser: "_Spec | None" = None
+    parser: _Spec | None = None
+    verify_checksum: _Spec | None = None
+    ingress: _Spec | None = None
+    egress: _Spec | None = None
+    compute_checksum: _Spec | None = None
+    deparser: _Spec | None = None
 
     def __post_init__(self) -> None:
-        if self.ingress is None:
-            raise TypeError("V1Switch requires ingress")
-        if self.deparser is None:
-            raise TypeError("V1Switch requires deparser")
-        annotations = self.parser._p4_annotations
-        self.headers: type[struct_cls] = annotations["hdr"]
-        self.metadata: type[struct_cls] = annotations["meta"]
+        if self.parser is not None:
+            annotations = self.parser._p4_annotations
+            self.headers: type[p4.struct] = annotations.get("hdr")
+            self.metadata: type[p4.struct] = annotations.get("meta")

@@ -2,9 +2,6 @@
 
 import p4py.lang as p4
 from p4py.arch.v1model import V1Switch, mark_to_drop, standard_metadata_t
-from p4py.lang.bit import bit
-from p4py.lang.header import header
-from p4py.lang.struct import struct
 
 
 class TestLangSurface:
@@ -18,10 +15,10 @@ class TestLangSurface:
         assert MyParser._p4_name == "MyParser"
 
     def test_parser_decorator_captures_annotations(self):
-        class my_hdrs(struct):
+        class my_hdrs(p4.struct):
             pass
 
-        class my_meta(struct):
+        class my_meta(p4.struct):
             pass
 
         @p4.parser
@@ -57,15 +54,15 @@ class TestLangSurface:
 
 class TestStandardMetadata:
     def test_is_header_subclass(self):
-        assert issubclass(standard_metadata_t, header)
+        assert issubclass(standard_metadata_t, p4.header)
 
     def test_has_ingress_port(self):
         fields = dict(standard_metadata_t._p4_fields)
-        assert fields["ingress_port"] == bit(9)
+        assert fields["ingress_port"] == p4.bit(9)
 
     def test_has_egress_spec(self):
         fields = dict(standard_metadata_t._p4_fields)
-        assert fields["egress_spec"] == bit(9)
+        assert fields["egress_spec"] == p4.bit(9)
 
 
 class TestMarkToDrop:
@@ -76,13 +73,13 @@ class TestMarkToDrop:
 
 class TestV1Switch:
     def test_creates_pipeline(self):
-        class eth_t(header):
-            x: bit(8)
+        class eth_t(p4.header):
+            x: p4.bit(8)
 
-        class hdrs_t(struct):
+        class hdrs_t(p4.struct):
             ethernet: eth_t
 
-        class meta_t(struct):
+        class meta_t(p4.struct):
             pass
 
         @p4.parser
