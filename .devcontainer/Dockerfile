@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:22.04
 
 # Avoid interactive prompts during package installation.
 ENV DEBIAN_FRONTEND=noninteractive
@@ -8,11 +8,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     git \
+    gnupg \
     python3 \
     python3-pip \
     python3-venv \
     shellcheck \
+    software-properties-common \
     unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add p4lang apt repository.
+RUN . /etc/lsb-release && \
+    echo "deb http://download.opensuse.org/repositories/home:/p4lang/xUbuntu_${DISTRIB_RELEASE}/ /" \
+    | tee /etc/apt/sources.list.d/home:p4lang.list && \
+    curl -fsSL "https://download.opensuse.org/repositories/home:p4lang/xUbuntu_${DISTRIB_RELEASE}/Release.key" \
+    | gpg --dearmor | tee /etc/apt/trusted.gpg.d/home_p4lang.gpg > /dev/null
+
+# Install P4 tools.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    p4lang-p4c \
+    p4lang-bmv2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bazelisk as bazel.
@@ -43,7 +58,7 @@ RUN DPRINT_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64"
     rm /tmp/dprint.zip
 
 # Install Python packages.
-RUN pip install --break-system-packages \
+RUN pip install \
     furo \
     myst-parser \
     sphinx \
