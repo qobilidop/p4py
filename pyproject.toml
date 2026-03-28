@@ -43,3 +43,4 @@ select = [
 "tests/compiler/*" = ["N801", "N802", "N815", "E743"]
 "tests/backend/*" = ["N801", "N802", "N815"]
 "tests/sim/*" = ["N801", "N802", "N815"]
+"tests/test_integration.py" = ["N801", "N802", "N815"]

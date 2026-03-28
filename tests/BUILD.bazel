@@ -5,3 +5,9 @@ py_test(
     srcs = ["test_version.py"],
     deps = ["//src/p4py"],
 )
+
+py_test(
+    name = "test_integration",
+    srcs = ["test_integration.py"],
+    deps = ["//src/p4py"],
+)
