@@ -201,10 +201,19 @@ class V1ModelArch(Architecture):
             lines.append("}")
             lines.append("")
 
-    def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
+    def process_packet(
+        self, package, engine_cls, packet, ingress_port, table_entries,
+        clone_session_map=None,
+    ):
         from p4py.sim import SimResult
 
+        if clone_session_map is None:
+            clone_session_map = {}
+
         eng = engine_cls(package, packet, table_entries)
+
+        # Track clone state.
+        clone_info: dict = {}
 
         # Initialize v1model standard metadata.
         eng.state.metadata["ingress_port"] = ingress_port
@@ -215,7 +224,13 @@ class V1ModelArch(Architecture):
         eng.register_extern("mark_to_drop", self._mark_to_drop(eng))
         eng.register_extern("verify_checksum", self._verify_checksum(eng))
         eng.register_extern("update_checksum", self._update_checksum(eng))
-        eng.register_extern("clone", lambda stmt: None)
+
+        def _clone_handler(stmt):
+            session_id = eng.eval_expression(stmt.args[1])
+            clone_info["session_id"] = session_id
+            clone_info["packet"] = bytes(eng.state.packet_bytes)
+
+        eng.register_extern("clone", _clone_handler)
 
         eng.run_parser(_get_block(package, "parser"))
 
@@ -225,8 +240,19 @@ class V1ModelArch(Architecture):
 
         eng.run_control(_get_block(package, "ingress"))
 
+        # Process clone after ingress.
+        clone_outputs: list[tuple[int, bytes]] = []
+        if clone_info:
+            session_id = clone_info["session_id"]
+            clone_port = clone_session_map.get(session_id)
+            if clone_port is not None:
+                clone_outputs.append((clone_port, clone_info["packet"]))
+
         if eng.state.metadata["egress_spec"] == _DROP_PORT:
-            return SimResult(packet=None, egress_port=_DROP_PORT, dropped=True)
+            return SimResult(
+                packet=None, egress_port=_DROP_PORT, dropped=True,
+                clone_outputs=tuple(clone_outputs),
+            )
 
         egress = _get_block(package, "egress")
         if egress is not None:
@@ -241,6 +267,7 @@ class V1ModelArch(Architecture):
             packet=output,
             egress_port=eng.state.metadata["egress_spec"],
             dropped=False,
+            clone_outputs=tuple(clone_outputs),
         )
 
     @staticmethod

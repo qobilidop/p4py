@@ -55,5 +55,8 @@ class Architecture(ABC):
         """Emit an empty block for a missing optional pipeline stage."""
 
     @abstractmethod
-    def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
+    def process_packet(
+        self, package, engine_cls, packet, ingress_port, table_entries,
+        clone_session_map=None,
+    ):
         """Simulate a packet through the architecture's pipeline."""

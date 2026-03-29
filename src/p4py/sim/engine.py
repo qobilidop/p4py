@@ -43,11 +43,31 @@ def init_state(
     metadata_widths: dict[str, int] = {}
     header_types = {h.name: h for h in package.headers}
     struct_types = {s.name: s for s in package.structs}
+
+    # Build a width map for named types (typedefs, newtypes, enums).
+    named_type_widths: dict[str, int] = {}
+    for decl in package.declarations:
+        if isinstance(decl, (ir.TypedefDecl, ir.NewtypeDecl)):
+            named_type_widths[decl.name] = decl.type.width
+        elif isinstance(decl, ir.EnumDecl):
+            named_type_widths[decl.name] = decl.underlying_type.width
+
+    def _member_width(member_type):
+        """Return the bit width for a member type, or None if not scalar."""
+        if isinstance(member_type, ir.BitType):
+            return member_type.width
+        if isinstance(member_type, ir.BoolType):
+            return 1
+        if isinstance(member_type, str) and member_type in named_type_widths:
+            return named_type_widths[member_type]
+        return None
+
     for s in package.structs:
         for member in s.members:
-            if isinstance(member.type, ir.BitType):
+            width = _member_width(member.type)
+            if width is not None:
                 metadata[member.name] = 0
-                metadata_widths[member.name] = member.type.width
+                metadata_widths[member.name] = width
             elif isinstance(member.type, str) and member.type in header_types:
                 headers[member.name] = _HeaderInstance(
                     type_info=header_types[member.type]
@@ -55,10 +75,11 @@ def init_state(
             elif isinstance(member.type, str) and member.type in struct_types:
                 inner = struct_types[member.type]
                 for inner_member in inner.members:
-                    if isinstance(inner_member.type, ir.BitType):
+                    inner_width = _member_width(inner_member.type)
+                    if inner_width is not None:
                         key = f"{member.name}.{inner_member.name}"
                         metadata[key] = 0
-                        metadata_widths[key] = inner_member.type.width
+                        metadata_widths[key] = inner_width
     return headers, metadata, metadata_widths
 
 

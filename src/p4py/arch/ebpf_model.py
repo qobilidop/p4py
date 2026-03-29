@@ -60,7 +60,10 @@ class EbpfFilterArch(Architecture):
     def emit_boilerplate(self, lines, spec, struct_names):
         pass  # All blocks required; no boilerplate needed.
 
-    def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
+    def process_packet(
+        self, package, engine_cls, packet, ingress_port, table_entries,
+        clone_session_map=None,
+    ):
         from p4py.sim import SimResult
 
         eng = engine_cls(package, packet, table_entries)
