@@ -15,6 +15,11 @@ P4-16 emission, simulation, and p4testgen verification.
   program, rewritten in P4Py. Programs may be simplified with `TODO` comments
   marking unsupported features to add later.
 
+- `sai_p4/` — Tests adapted from the
+  [sonic-net/sonic-pins](https://github.com/sonic-net/sonic-pins) `sai_p4/`
+  corpus. A production-grade SAI-compatible P4 program, used as a north star for
+  driving P4Py toward real-world complexity. See `sai_p4/README.md` for details.
+
 ## Test types
 
 - **Golden tests** (`*_golden_test.py`) — Verify the compiled P4-16 output
