@@ -266,16 +266,16 @@ control acl_wbb_ingress(in headers_t headers,
     direct_meter<MeterColor_t>(MeterType.bytes) acl_wbb_ingress_meter;
 
     action acl_wbb_ingress_copy() {
-        read(local_metadata.color);
-        clone(v1model.CloneType.I2E, COPY_TO_CPU_SESSION_ID);
-        count();
+        acl_wbb_ingress_meter.read(local_metadata.color);
+        clone(CloneType.I2E, 255);
+        acl_wbb_ingress_counter.count();
     }
 
     action acl_wbb_ingress_trap() {
-        read(local_metadata.color);
-        clone(v1model.CloneType.I2E, COPY_TO_CPU_SESSION_ID);
+        acl_wbb_ingress_meter.read(local_metadata.color);
+        clone(CloneType.I2E, 255);
         mark_to_drop(standard_metadata);
-        count();
+        acl_wbb_ingress_counter.count();
     }
 
     table acl_wbb_ingress_table {
@@ -290,6 +290,7 @@ control acl_wbb_ingress(in headers_t headers,
             acl_wbb_ingress_trap;
             NoAction;
         }
+        default_action = NoAction();
         meters = acl_wbb_ingress_meter;
         counters = acl_wbb_ingress_counter;
         size = 8;

@@ -31,6 +31,7 @@ class _SimState:
     metadata_widths: dict[str, int]
     program: object  # Package
     control_locals: dict[str, int] = field(default_factory=dict)
+    control_local_widths: dict[str, int] = field(default_factory=dict)
 
 
 def init_state(
@@ -172,6 +173,7 @@ def _run_control(
     # Initialize control-local variables
     for lv in control.local_vars:
         state.control_locals[lv.name] = lv.init_value
+        state.control_local_widths[lv.name] = lv.type.width
 
     for stmt in control.apply_body:
         _exec_control_statement(state, stmt, ctx)
@@ -211,6 +213,13 @@ def _exec_control_statement(
             ctx.externs[stmt.name](stmt)
         else:
             _exec_action_by_name(state, stmt.name, {}, ctx)
+    elif isinstance(stmt, ir.MethodCall) and stmt.method == "apply":
+        # Sub-control apply: look up from package and execute
+        control_name = stmt.object.path[0]
+        for sc in state.program.sub_controls:
+            if sc.name == control_name:
+                _run_control(state, sc, ctx.entries, ctx.externs)
+                break
     elif isinstance(stmt, ir.Assignment):
         value = _eval_expression(state, stmt.value, {})
         _set_field(state, stmt.target, value)
@@ -227,10 +236,16 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
     match_kinds = {}
     field_widths = {}
     for table_key in table.keys:
-        field_path = ".".join(table_key.field.path)
-        lookup_key[field_path] = _eval_expression(state, table_key.field, {})
-        match_kinds[field_path] = table_key.match_kind
-        field_widths[field_path] = _resolve_field_width(state, table_key.field)
+        if isinstance(table_key.field, ir.IsValid):
+            field_path = _emit_is_valid_path(table_key.field)
+            lookup_key[field_path] = _eval_expression(state, table_key.field, {})
+            match_kinds[field_path] = table_key.match_kind
+            field_widths[field_path] = 1  # isValid() returns a 1-bit value
+        else:
+            field_path = ".".join(table_key.field.path)
+            lookup_key[field_path] = _eval_expression(state, table_key.field, {})
+            match_kinds[field_path] = table_key.match_kind
+            field_widths[field_path] = _resolve_field_width(state, table_key.field)
 
     best_match = None
     best_score = -1
@@ -325,6 +340,9 @@ def _resolve_struct_field_width(
 def _resolve_field_width(state: _SimState, field: ir.FieldAccess) -> int:
     """Look up the bit width of a header or metadata field."""
     path = field.path
+    # Single-element path: control-local variable
+    if len(path) == 1 and path[0] in state.control_local_widths:
+        return state.control_local_widths[path[0]]
     # 3-element path: *.header.field
     if len(path) == 3 and path[1] in state.headers:
         header_inst = state.headers[path[1]]
@@ -527,6 +545,11 @@ def _eval_expression(
     if isinstance(expr, ir.IsValid):
         return int(_eval_is_valid(state, expr))
     raise ValueError(f"Cannot evaluate: {expr}")
+
+
+def _emit_is_valid_path(iv: ir.IsValid) -> str:
+    """Generate a unique key for an isValid() table key."""
+    return ".".join(iv.header_ref.path) + ".isValid()"
 
 
 def _eval_is_valid(state: _SimState, iv: ir.IsValid) -> bool:

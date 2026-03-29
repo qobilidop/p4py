@@ -6,8 +6,6 @@ from p4py.arch.v1model import standard_metadata_t
 
 from tests.e2e.sai_p4.fixed.metadata import MeterColor_t, headers_t, local_metadata_t
 
-COPY_TO_CPU_SESSION_ID = 255
-
 
 @p4.control
 def acl_wbb_ingress(
@@ -23,13 +21,13 @@ def acl_wbb_ingress(
     @p4.action
     def acl_wbb_ingress_copy():
         acl_wbb_ingress_meter.read(local_metadata.color)
-        v1model.clone(v1model.CloneType.I2E, COPY_TO_CPU_SESSION_ID)
+        v1model.clone(v1model.CloneType.I2E, 255)
         acl_wbb_ingress_counter.count()
 
     @p4.action
     def acl_wbb_ingress_trap():
         acl_wbb_ingress_meter.read(local_metadata.color)
-        v1model.clone(v1model.CloneType.I2E, COPY_TO_CPU_SESSION_ID)
+        v1model.clone(v1model.CloneType.I2E, 255)
         v1model.mark_to_drop(standard_metadata)
         acl_wbb_ingress_counter.count()
 

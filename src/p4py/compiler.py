@@ -264,7 +264,9 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
     raise ValueError(f"Unsupported expression: {ast.dump(node)}")
 
 
-def _ast_to_statement(node: ast.stmt, params: set[str]) -> ir.Statement:
+def _ast_to_statement(
+    node: ast.stmt, params: set[str], control_locals: frozenset[str] = frozenset()
+) -> ir.Statement:
     """Convert an AST statement to an IR Statement."""
     # Assignment: target = value
     if isinstance(node, ast.Assign) and len(node.targets) == 1:
@@ -274,20 +276,22 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> ir.Statement:
 
     # Expression statement (method call, function call, etc.)
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-        return _ast_call_to_statement(node.value, params)
+        return _ast_call_to_statement(node.value, params, control_locals)
 
     # If/else
     if isinstance(node, ast.If):
         condition = _ast_to_expression(node.test)
         then_body = tuple(
-            s for n in node.body if (s := _ast_to_statement(n, params)) is not None
+            s
+            for n in node.body
+            if (s := _ast_to_statement(n, params, control_locals)) is not None
         )
         else_body = []
         for n in node.orelse:
             if isinstance(n, ast.If):
-                else_body.append(_ast_to_statement(n, params))
+                else_body.append(_ast_to_statement(n, params, control_locals))
             else:
-                s = _ast_to_statement(n, params)
+                s = _ast_to_statement(n, params, control_locals)
                 if s is not None:
                     else_body.append(s)
         else_body = tuple(else_body)
@@ -323,7 +327,9 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> ir.Statement:
     raise ValueError(f"Unsupported statement: {ast.dump(node)}")
 
 
-def _ast_call_to_statement(call: ast.Call, params: set[str]) -> ir.Statement:
+def _ast_call_to_statement(
+    call: ast.Call, params: set[str], control_locals: frozenset[str] = frozenset()
+) -> ir.Statement:
     """Convert an AST Call to a Statement (MethodCall, FunctionCall, etc.)."""
     # obj.method(args) — e.g., pkt.extract(hdr.ethernet)
     if isinstance(call.func, ast.Attribute):
@@ -341,6 +347,11 @@ def _ast_call_to_statement(call: ast.Call, params: set[str]) -> ir.Statement:
             obj = ir.FieldAccess(path=(attr.value.id,))
             args = tuple(_ast_to_expression(a) for a in call.args)
             return ir.MethodCall(object=obj, method="apply", args=args)
+        # Control-local object method call (counter.count(), meter.read())
+        if isinstance(attr.value, ast.Name) and attr.value.id in control_locals:
+            obj = ir.FieldAccess(path=(attr.value.id,))
+            args = tuple(_ast_to_expression(a) for a in call.args)
+            return ir.MethodCall(object=obj, method=attr.attr, args=args)
         # Module-qualified function: name.func(args) where name is not a
         # block parameter (e.g. v1model.mark_to_drop).  Strip the module
         # prefix and emit a plain FunctionCall.
@@ -355,7 +366,18 @@ def _ast_call_to_statement(call: ast.Call, params: set[str]) -> ir.Statement:
                     args.append(expr)
                 args = tuple(args)
             else:
-                args = tuple(_ast_to_expression(a) for a in call.args)
+                args = []
+                for a in call.args:
+                    expr = _ast_to_expression(a)
+                    # Strip module prefix from arguments
+                    if (
+                        isinstance(expr, ir.FieldAccess)
+                        and len(expr.path) > 1
+                        and expr.path[0] == module_name
+                    ):
+                        expr = ir.FieldAccess(path=expr.path[1:])
+                    args.append(expr)
+                args = tuple(args)
             return ir.FunctionCall(name=attr.attr, args=args)
         obj = _ast_to_field_access(attr.value)
         args = tuple(_ast_to_expression(a) for a in call.args)
@@ -481,22 +503,34 @@ def _compile_control(spec) -> ir.ControlDecl:
     direct_meters: list[ir.DirectMeter] = []
     local_vars: list[ir.LocalVarDecl] = []
 
+    # First pass: collect direct counters and meters to build control-local names.
+    for node in func_def.body:
+        if isinstance(node, ast.Assign) and _is_direct_counter(node):
+            direct_counters.append(_compile_direct_counter(node))
+        elif isinstance(node, ast.Assign) and _is_direct_meter(node):
+            direct_meters.append(_compile_direct_meter(node))
+
+    control_local_names = frozenset(
+        {dc.name for dc in direct_counters} | {dm.name for dm in direct_meters}
+    )
+
+    # Second pass: compile all nodes.
     for node in func_def.body:
         # @p4.action decorated function → ActionDecl
         if isinstance(node, ast.FunctionDef) and _has_p4_decorator(node, "action"):
-            actions.append(_compile_action(node, params))
+            actions.append(_compile_action(node, params, control_local_names))
         # name = p4.table(...) → TableDecl
         elif isinstance(node, ast.Assign) and _is_table_call(node):
             tables.append(_compile_table(node))
         # name = p4.bit(W) → LocalVarDecl
         elif isinstance(node, ast.Assign) and _is_local_var_decl(node):
             local_vars.append(_compile_local_var(node))
-        # name = v1model.direct_counter(...) → DirectCounter
+        # name = v1model.direct_counter(...) → DirectCounter (already collected)
         elif isinstance(node, ast.Assign) and _is_direct_counter(node):
-            direct_counters.append(_compile_direct_counter(node))
-        # name = v1model.direct_meter(...) → DirectMeter
+            continue
+        # name = v1model.direct_meter(...) → DirectMeter (already collected)
         elif isinstance(node, ast.Assign) and _is_direct_meter(node):
-            direct_meters.append(_compile_direct_meter(node))
+            continue
         # pass statement — skip
         elif isinstance(node, ast.Pass):
             continue
@@ -524,7 +558,11 @@ def _has_p4_decorator(node: ast.FunctionDef, name: str) -> bool:
     return False
 
 
-def _compile_action(func_def: ast.FunctionDef, block_params: set[str]) -> ir.ActionDecl:
+def _compile_action(
+    func_def: ast.FunctionDef,
+    block_params: set[str],
+    control_locals: frozenset[str] = frozenset(),
+) -> ir.ActionDecl:
     """Compile a @p4.action function into an ActionDecl."""
     action_params = []
     for arg in func_def.args.args:
@@ -554,7 +592,7 @@ def _compile_action(func_def: ast.FunctionDef, block_params: set[str]) -> ir.Act
     body = tuple(
         s
         for node in func_def.body
-        if (s := _ast_to_statement(node, block_params)) is not None
+        if (s := _ast_to_statement(node, block_params, control_locals)) is not None
     )
     return ir.ActionDecl(name=func_def.name, params=tuple(action_params), body=body)
 
@@ -649,6 +687,8 @@ def _compile_table(node: ast.Assign) -> ir.TableDecl:
         elif kw.arg == "default_action":
             if isinstance(kw.value, ast.Name):
                 default_action = kw.value.id
+            elif isinstance(kw.value, ast.Attribute):
+                default_action = kw.value.attr
             elif isinstance(kw.value, ast.Call):
                 default_action = kw.value.func.id
                 default_action_args = tuple(
