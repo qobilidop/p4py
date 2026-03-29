@@ -63,5 +63,18 @@ class TestNewtypeDecl(absltest.TestCase):
             decl.name = "other"
 
 
+class TestConstDecl(absltest.TestCase):
+    def test_creation(self):
+        decl = ir.ConstDecl(name="PORT_CPU", type_name="PortId_t", value=255)
+        self.assertEqual(decl.name, "PORT_CPU")
+        self.assertEqual(decl.type_name, "PortId_t")
+        self.assertEqual(decl.value, 255)
+
+    def test_frozen(self):
+        decl = ir.ConstDecl(name="PORT_CPU", type_name="PortId_t", value=255)
+        with self.assertRaises(FrozenInstanceError):
+            decl.name = "other"
+
+
 if __name__ == "__main__":
     absltest.main()

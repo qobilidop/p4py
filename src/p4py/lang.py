@@ -85,6 +85,27 @@ def enum(underlying: BitType):
     return _EnumBase
 
 
+# --- _Const ---
+
+
+class _Const:
+    """A P4 compile-time constant."""
+
+    def __init__(self, type_name: str, value: int, name: str) -> None:
+        self._p4_type_name = type_name
+        self._p4_value = value
+        self._p4_name = name
+        self._p4_kind = "const"
+
+    def __repr__(self) -> str:
+        return self._p4_name
+
+
+def const(type_ref: _NamedType, value: int, name: str) -> _Const:
+    """Create a P4 const declaration."""
+    return _Const(type_ref._p4_name, value, name)
+
+
 # --- header ---
 
 

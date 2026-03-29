@@ -58,6 +58,22 @@ class TestEnum(absltest.TestCase):
         self.assertEqual(meta_t._p4_members[0], ("color", Color_t))
 
 
+class TestConst(absltest.TestCase):
+    def test_basic(self):
+        PortId_t = p4.newtype(p4.bit(9), "PortId_t")
+        PORT_CPU = p4.const(PortId_t, 255, "PORT_CPU")
+        self.assertEqual(PORT_CPU._p4_name, "PORT_CPU")
+        self.assertEqual(PORT_CPU._p4_type_name, "PortId_t")
+        self.assertEqual(PORT_CPU._p4_value, 255)
+        self.assertEqual(PORT_CPU._p4_kind, "const")
+
+    def test_with_typedef(self):
+        MyType = p4.typedef(p4.bit(8), "MyType")
+        MY_CONST = p4.const(MyType, 42, "MY_CONST")
+        self.assertEqual(MY_CONST._p4_type_name, "MyType")
+        self.assertEqual(MY_CONST._p4_value, 42)
+
+
 class TestNewtype(absltest.TestCase):
     def test_basic(self):
         PortId_t = p4.newtype(p4.bit(9), "PortId_t")

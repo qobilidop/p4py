@@ -73,6 +73,13 @@ class EnumDecl:
     members: tuple[EnumMember, ...]
 
 
+@dataclass(frozen=True)
+class ConstDecl:
+    name: str
+    type_name: str
+    value: int
+
+
 # --- Expressions ---
 
 
