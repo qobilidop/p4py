@@ -34,6 +34,7 @@ const vlan_id_t INTERNAL_VLAN_ID = 0x0fff;
 const vlan_id_t NO_VLAN_ID = 0;
 const vrf_id_t kDefaultVrf = 0;
 typedef bit<8> ip_protocol_t;
+typedef bit<32> instance_type_t;
 const port_id_t SAI_P4_CPU_PORT = 0x01fe;
 const ether_type_t ETHERTYPE_IPV4 = 0x0800;
 const ether_type_t ETHERTYPE_IPV6 = 0x86dd;
@@ -46,6 +47,9 @@ const ip_protocol_t IP_PROTOCOL_UDP = 17;
 const ip_protocol_t IP_PROTOCOL_IPV6 = 41;
 const ip_protocol_t IP_PROTOCOL_ICMPV6 = 58;
 const ip_protocol_t IP_PROTOCOL_V6_EXTENSION_HOP_BY_HOP = 0;
+const instance_type_t PKT_INSTANCE_TYPE_INGRESS_CLONE = 1;
+const instance_type_t PKT_INSTANCE_TYPE_EGRESS_CLONE = 2;
+const instance_type_t PKT_INSTANCE_TYPE_REPLICATION = 5;
 
 header packet_in_header_t {
     port_id_t ingress_port;
@@ -269,6 +273,163 @@ struct local_metadata_t {
     bool acl_drop;
 }
 
+control packet_out_decap(headers,
+                         local_metadata,
+                         standard_metadata) {
+    apply {
+        if (headers.packet_out_header.isValid() && headers.packet_out_header.submit_to_ingress == 0) {
+            standard_metadata.egress_spec = (bit<9>) headers.packet_out_header.egress_port;
+            local_metadata.bypass_ingress = true;
+        }
+        headers.packet_out_header.setInvalid();
+    }
+}
+
+control vlan_untag(headers,
+                   local_metadata,
+                   standard_metadata) {
+    action disable_vlan_checks() {
+        local_metadata.enable_vlan_checks = false;
+    }
+
+    table disable_vlan_checks_table {
+        key = {
+            1w1: ternary;
+        }
+        actions = {
+            disable_vlan_checks;
+        }
+        size = 1;
+    }
+
+    apply {
+        if (headers.vlan.isValid()) {
+            local_metadata.vlan_id = headers.vlan.vlan_id;
+            headers.ethernet.ether_type = headers.vlan.ether_type;
+            headers.vlan.setInvalid();
+            local_metadata.input_packet_is_vlan_tagged = true;
+        } else {
+            local_metadata.vlan_id = INTERNAL_VLAN_ID;
+        }
+        local_metadata.enable_vlan_checks = true;
+        disable_vlan_checks_table.apply();
+    }
+}
+
+control ingress_vlan_checks(headers,
+                            local_metadata,
+                            standard_metadata) {
+    bool enable_ingress_vlan_checks = true;
+
+    bool ingress_port_is_member_of_vlan = false;
+
+    action disable_ingress_vlan_checks() {
+        enable_ingress_vlan_checks = false;
+    }
+
+    table disable_ingress_vlan_checks_table {
+        key = {
+            1w1: lpm;
+        }
+        actions = {
+            disable_ingress_vlan_checks;
+        }
+        size = 1;
+    }
+
+    apply {
+        disable_ingress_vlan_checks_table.apply();
+        if (local_metadata.enable_vlan_checks && enable_ingress_vlan_checks && !ingress_port_is_member_of_vlan && !(local_metadata.vlan_id == NO_VLAN_ID || local_metadata.vlan_id == INTERNAL_VLAN_ID)) {
+            local_metadata.marked_to_drop_by_ingress_vlan_checks = true;
+            mark_to_drop(standard_metadata);
+        }
+    }
+}
+
+control egress_vlan_checks(headers,
+                           local_metadata,
+                           standard_metadata) {
+    bit<9> port = 0;
+
+    bool egress_port_is_member_of_vlan = false;
+
+    bool enable_egress_vlan_checks = true;
+
+    action disable_egress_vlan_checks() {
+        enable_egress_vlan_checks = false;
+    }
+
+    action no_action() {
+    }
+
+    action make_tagged_member() {
+        egress_port_is_member_of_vlan = true;
+    }
+
+    action make_untagged_member() {
+        egress_port_is_member_of_vlan = true;
+        local_metadata.omit_vlan_tag_on_egress_packet = true;
+    }
+
+    table disable_egress_vlan_checks_table {
+        key = {
+            1w1: lpm;
+        }
+        actions = {
+            disable_egress_vlan_checks;
+        }
+        size = 1;
+    }
+
+    table vlan_table {
+        key = {
+            local_metadata.vlan_id: exact;
+        }
+        actions = {
+            no_action;
+        }
+    }
+
+    table vlan_membership_table {
+        key = {
+            local_metadata.vlan_id: exact;
+            port: exact;
+        }
+        actions = {
+            make_tagged_member;
+            make_untagged_member;
+            NoAction;
+        }
+        default_action = NoAction();
+    }
+
+    apply {
+        disable_egress_vlan_checks_table.apply();
+        vlan_table.apply();
+        if (!(standard_metadata.instance_type == PKT_INSTANCE_TYPE_INGRESS_CLONE) && !(standard_metadata.instance_type == PKT_INSTANCE_TYPE_EGRESS_CLONE)) {
+            vlan_membership_table.apply();
+            if (local_metadata.enable_vlan_checks && enable_egress_vlan_checks && !egress_port_is_member_of_vlan && !(local_metadata.vlan_id == NO_VLAN_ID || local_metadata.vlan_id == INTERNAL_VLAN_ID)) {
+                mark_to_drop(standard_metadata);
+            }
+        }
+    }
+}
+
+control vlan_tag(headers,
+                 local_metadata,
+                 standard_metadata) {
+    apply {
+        if (!(local_metadata.vlan_id == NO_VLAN_ID || local_metadata.vlan_id == INTERNAL_VLAN_ID) && !(standard_metadata.instance_type == PKT_INSTANCE_TYPE_EGRESS_CLONE) && !local_metadata.omit_vlan_tag_on_egress_packet) {
+            headers.vlan.setValid();
+            headers.vlan.priority_code_point = 0;
+            headers.vlan.drop_eligible_indicator = 0;
+            headers.vlan.vlan_id = local_metadata.vlan_id;
+            headers.vlan.ether_type = headers.ethernet.ether_type;
+            headers.ethernet.ether_type = ETHERTYPE_8021Q;
+        }
+    }
+}
+
 parser packet_parser(packet_in packet,
                 out headers_t headers,
                 inout local_metadata_t local_metadata,
@@ -445,6 +606,11 @@ control ingress(inout headers_t headers,
                   inout local_metadata_t local_metadata,
                   inout standard_metadata_t standard_metadata) {
     apply {
+        packet_out_decap.apply(headers, local_metadata, standard_metadata);
+        if (!local_metadata.bypass_ingress) {
+            vlan_untag.apply(headers, local_metadata, standard_metadata);
+            ingress_vlan_checks.apply(headers, local_metadata, standard_metadata);
+        }
     }
 }
 
@@ -452,6 +618,10 @@ control egress(inout headers_t headers,
                   inout local_metadata_t local_metadata,
                   inout standard_metadata_t standard_metadata) {
     apply {
+        if (!local_metadata.bypass_egress) {
+            egress_vlan_checks.apply(headers, local_metadata, standard_metadata);
+            vlan_tag.apply(headers, local_metadata, standard_metadata);
+        }
     }
 }
 

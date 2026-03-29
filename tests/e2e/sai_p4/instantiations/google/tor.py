@@ -34,6 +34,13 @@ from tests.e2e.sai_p4.fixed.metadata import (
     vrf_id_t,
     wcmp_group_id_t,
 )
+from tests.e2e.sai_p4.fixed.packet_io import packet_out_decap
+from tests.e2e.sai_p4.fixed.vlan import (
+    egress_vlan_checks,
+    ingress_vlan_checks,
+    vlan_tag,
+    vlan_untag,
+)
 
 
 @p4.parser
@@ -232,12 +239,17 @@ def packet_parser(
 
 @p4.control
 def ingress(headers, local_metadata, standard_metadata):
-    pass
+    packet_out_decap.apply(headers, local_metadata, standard_metadata)
+    if not local_metadata.bypass_ingress:
+        vlan_untag.apply(headers, local_metadata, standard_metadata)
+        ingress_vlan_checks.apply(headers, local_metadata, standard_metadata)
 
 
 @p4.control
 def egress(headers, local_metadata, standard_metadata):
-    pass
+    if not local_metadata.bypass_egress:
+        egress_vlan_checks.apply(headers, local_metadata, standard_metadata)
+        vlan_tag.apply(headers, local_metadata, standard_metadata)
 
 
 @p4.control
@@ -322,6 +334,13 @@ main = V1Switch(
     egress=egress,
     compute_checksum=compute_ipv4_checksum,
     deparser=packet_deparser,
+    sub_controls=(
+        packet_out_decap,
+        vlan_untag,
+        ingress_vlan_checks,
+        egress_vlan_checks,
+        vlan_tag,
+    ),
     declarations=(
         # Typedefs from headers.
         ethernet_addr_t,
@@ -354,6 +373,7 @@ main = V1Switch(
         kDefaultVrf,
         # ids.py typedefs.
         _c._ip_protocol_t,
+        _c._instance_type_t,
         # ids.py consts.
         _c.SAI_P4_CPU_PORT,
         _c.ETHERTYPE_IPV4,
@@ -367,5 +387,8 @@ main = V1Switch(
         _c.IP_PROTOCOL_IPV6,
         _c.IP_PROTOCOL_ICMPV6,
         _c.IP_PROTOCOL_V6_EXTENSION_HOP_BY_HOP,
+        _c.PKT_INSTANCE_TYPE_INGRESS_CLONE,
+        _c.PKT_INSTANCE_TYPE_EGRESS_CLONE,
+        _c.PKT_INSTANCE_TYPE_REPLICATION,
     ),
 )
