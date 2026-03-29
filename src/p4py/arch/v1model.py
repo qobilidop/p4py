@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import p4py.lang as p4
 from p4py.lang import _Spec
+from p4py.arch.base import Architecture, BlockSpec
 
 
 class standard_metadata_t(p4.header):
@@ -62,6 +63,69 @@ verify_checksum = _ChecksumExtern("verify_checksum")
 update_checksum = _ChecksumExtern("update_checksum")
 
 
+class V1ModelArch(Architecture):
+    @property
+    def include(self) -> str:
+        return "v1model.p4"
+
+    @property
+    def pipeline(self) -> tuple[BlockSpec, ...]:
+        return (
+            BlockSpec("parser", "parser"),
+            BlockSpec("verify_checksum", "control", required=False),
+            BlockSpec("ingress", "control"),
+            BlockSpec("egress", "control", required=False),
+            BlockSpec("compute_checksum", "control", required=False),
+            BlockSpec("deparser", "deparser"),
+        )
+
+    def block_signature(self, block_name, struct_names):
+        h = struct_names["headers"]
+        m = struct_names["metadata"]
+        if block_name == "parser":
+            return (f"parser {{name}}(packet_in pkt,\n"
+                    f"                out {h} hdr,\n"
+                    f"                inout {m} meta,\n"
+                    f"                inout standard_metadata_t std_meta)")
+        if block_name in ("verify_checksum", "compute_checksum"):
+            return f"control {{name}}(inout {h} hdr, inout {m} meta)"
+        if block_name == "deparser":
+            return f"control {{name}}(packet_out pkt, in {h} hdr)"
+        # ingress, egress
+        return (f"control {{name}}(inout {h} hdr,\n"
+                f"                  inout {m} meta,\n"
+                f"                  inout standard_metadata_t std_meta)")
+
+    def main_instantiation(self, block_names):
+        names = []
+        for spec in self.pipeline:
+            names.append(f"    {block_names[spec.name]}()")
+        return "V1Switch(\n" + ",\n".join(names) + "\n) main;"
+
+    def emit_boilerplate(self, lines, spec, struct_names):
+        h = struct_names["headers"]
+        m = struct_names["metadata"]
+        if spec.name in ("verify_checksum", "compute_checksum"):
+            cap = "MyVerifyChecksum" if spec.name == "verify_checksum" else "MyComputeChecksum"
+            lines.append(f"control {cap}(inout {h} hdr, inout {m} meta) {{")
+            lines.append("    apply {}")
+            lines.append("}")
+            lines.append("")
+        elif spec.name == "egress":
+            lines.append(f"control MyEgress(inout {h} hdr,")
+            lines.append(f"                  inout {m} meta,")
+            lines.append("                  inout standard_metadata_t std_meta) {")
+            lines.append("    apply {}")
+            lines.append("}")
+            lines.append("")
+
+    def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
+        raise NotImplementedError("Implemented in Task 7")
+
+
+_V1MODEL_ARCH = V1ModelArch()
+
+
 @dataclass
 class V1Switch:
     """v1model pipeline with field order matching v1model.p4.
@@ -82,6 +146,7 @@ class V1Switch:
     deparser: _Spec | None = None
 
     def __post_init__(self) -> None:
+        self.arch: Architecture = _V1MODEL_ARCH
         if self.parser is not None:
             annotations = self.parser._p4_annotations
             self.headers: type[p4.struct] = annotations.get("hdr")

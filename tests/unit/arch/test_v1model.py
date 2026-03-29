@@ -3,7 +3,8 @@
 from absl.testing import absltest
 
 import p4py.lang as p4
-from p4py.arch.v1model import V1Switch, mark_to_drop, standard_metadata_t
+from p4py.arch import v1model
+from p4py.arch.v1model import V1ModelArch, V1Switch, mark_to_drop, standard_metadata_t
 
 
 class TestLangSurface(absltest.TestCase):
@@ -111,6 +112,63 @@ class TestV1Switch(absltest.TestCase):
         self.assertIsNone(pipeline.verify_checksum)
         self.assertIsNone(pipeline.egress)
         self.assertIsNone(pipeline.compute_checksum)
+
+
+class TestV1ModelArch(absltest.TestCase):
+    def test_include(self):
+        arch = V1ModelArch()
+        self.assertEqual(arch.include, "v1model.p4")
+
+    def test_pipeline_has_six_blocks(self):
+        arch = V1ModelArch()
+        self.assertLen(arch.pipeline, 6)
+        names = [s.name for s in arch.pipeline]
+        self.assertEqual(names, [
+            "parser", "verify_checksum", "ingress",
+            "egress", "compute_checksum", "deparser",
+        ])
+
+    def test_optional_blocks(self):
+        arch = V1ModelArch()
+        required = {s.name: s.required for s in arch.pipeline}
+        self.assertTrue(required["parser"])
+        self.assertTrue(required["ingress"])
+        self.assertTrue(required["deparser"])
+        self.assertFalse(required["verify_checksum"])
+        self.assertFalse(required["egress"])
+        self.assertFalse(required["compute_checksum"])
+
+    def test_v1switch_has_arch(self):
+        sw = v1model.V1Switch()
+        self.assertIsInstance(sw.arch, V1ModelArch)
+
+    def test_block_signature_parser(self):
+        arch = V1ModelArch()
+        names = {"headers": "headers_t", "metadata": "metadata_t"}
+        sig = arch.block_signature("parser", names)
+        self.assertIn("packet_in", sig)
+        self.assertIn("headers_t", sig)
+        self.assertIn("metadata_t", sig)
+        self.assertIn("standard_metadata_t", sig)
+
+    def test_block_signature_control(self):
+        arch = V1ModelArch()
+        names = {"headers": "headers_t", "metadata": "metadata_t"}
+        sig = arch.block_signature("ingress", names)
+        self.assertIn("inout headers_t", sig)
+        self.assertIn("standard_metadata_t", sig)
+
+    def test_main_instantiation(self):
+        arch = V1ModelArch()
+        block_names = {
+            "parser": "MyParser", "verify_checksum": "MyVerifyChecksum",
+            "ingress": "MyIngress", "egress": "MyEgress",
+            "compute_checksum": "MyComputeChecksum", "deparser": "MyDeparser",
+        }
+        main = arch.main_instantiation(block_names)
+        self.assertIn("V1Switch(", main)
+        self.assertIn("MyParser()", main)
+        self.assertIn(") main;", main)
 
 
 if __name__ == "__main__":
