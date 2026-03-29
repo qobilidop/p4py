@@ -1,96 +1,93 @@
 """P4-16 code emitter.
 
-Traverses IR nodes and emits syntactically valid P4-16 source targeting v1model.
-Generates boilerplate for unused v1model pipeline stages.
+Traverses IR nodes and emits syntactically valid P4-16 source.
+Architecture-specific details (signatures, boilerplate, main instantiation)
+are delegated to the architecture descriptor on the Package.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from p4py.ir import nodes
 
 
-def emit(program: nodes.Program | nodes.EbpfProgram) -> str:
-    """Emit a P4-16 source string from an IR Program."""
-    if isinstance(program, nodes.EbpfProgram):
-        return _emit_ebpf(program)
-    return _emit_v1model(program)
-
-
-def _emit_v1model(program: nodes.Program) -> str:
-    """Emit P4-16 source targeting v1model."""
-    # Derive the headers and metadata struct names from the program.
-    # Convention: the first struct with header-typed members is headers,
-    # the last struct is metadata.
-    headers_name = program.structs[0].name
-    metadata_name = program.structs[-1].name
-    names = _StructNames(headers=headers_name, metadata=metadata_name)
-
+def emit(package: nodes.Package) -> str:
+    """Emit a P4-16 source string from a Package."""
+    arch = package.arch
     lines: list[str] = []
     lines.append("#include <core.p4>")
-    lines.append("#include <v1model.p4>")
+    lines.append(f"#include <{arch.include}>")
     lines.append("")
 
-    for h in program.headers:
+    for h in package.headers:
         _emit_header(lines, h)
-    for s in program.structs:
+    for s in package.structs:
         _emit_struct(lines, s)
 
-    _emit_parser(lines, program.parser, names)
-    _emit_verify_checksum(lines, program.verify_checksum, names)
-    _emit_control(lines, program.ingress, names)
-    _emit_egress(lines, program.egress, names)
-    _emit_compute_checksum(lines, program.compute_checksum, names)
-    _emit_deparser(lines, program.deparser, names)
-    _emit_main(lines, program)
+    struct_names = _derive_struct_names(package)
+
+    for entry in package.blocks:
+        sig = arch.block_signature(entry.name, struct_names)
+        if entry.kind == "parser":
+            _emit_parser_block(lines, entry.decl, sig)
+        elif entry.kind == "deparser":
+            _emit_deparser_block(lines, entry.decl, sig)
+        elif entry.kind == "control":
+            _emit_control_block(lines, entry.decl, sig)
+
+    # Boilerplate for missing optional blocks.
+    for spec in arch.pipeline:
+        if not any(b.name == spec.name for b in package.blocks):
+            arch.emit_boilerplate(lines, spec, struct_names)
+
+    block_names = {}
+    for spec in arch.pipeline:
+        match = next((b for b in package.blocks if b.name == spec.name), None)
+        if match:
+            block_names[spec.name] = match.decl.name
+        else:
+            block_names[spec.name] = _boilerplate_name(spec.name)
+    lines.append(arch.main_instantiation(block_names))
 
     return "\n".join(lines) + "\n"
 
 
-def _emit_ebpf(program: nodes.EbpfProgram) -> str:
-    """Emit P4-16 source targeting ebpf_model."""
-    headers_name = program.structs[0].name
-
-    lines: list[str] = []
-    lines.append("#include <core.p4>")
-    lines.append("#include <ebpf_model.p4>")
-    lines.append("")
-
-    for h in program.headers:
-        _emit_header(lines, h)
-    for s in program.structs:
-        _emit_struct(lines, s)
-
-    _emit_ebpf_parser(lines, program.parser, headers_name)
-    _emit_ebpf_control(lines, program.filter, headers_name)
-    _emit_ebpf_main(lines, program)
-
-    return "\n".join(lines) + "\n"
+def _derive_struct_names(package: nodes.Package) -> dict[str, str]:
+    """Derive struct name mapping from the package."""
+    names: dict[str, str] = {"headers": package.structs[0].name}
+    if len(package.structs) > 1:
+        names["metadata"] = package.structs[-1].name
+    return names
 
 
-def _emit_ebpf_parser(
-    lines: list[str], p: nodes.ParserDecl, headers_name: str
+def _boilerplate_name(block_name: str) -> str:
+    """Generate a default name for a missing optional block."""
+    parts = block_name.split("_")
+    return "My" + "".join(p.capitalize() for p in parts)
+
+
+# --- Generic block emitters ---
+
+
+def _emit_parser_block(
+    lines: list[str], p: nodes.ParserDecl, sig: str
 ) -> None:
-    lines.append(f"parser {p.name}(packet_in p, out {headers_name} headers) {{")
+    sig_line = sig.replace("{name}", p.name)
+    lines.append(sig_line + " {")
     for state in p.states:
         _emit_parser_state(lines, state)
     lines.append("}")
     lines.append("")
 
 
-def _emit_ebpf_control(
-    lines: list[str], c: nodes.ControlDecl, headers_name: str
+def _emit_control_block(
+    lines: list[str], c: nodes.ControlDecl, sig: str
 ) -> None:
-    lines.append(
-        f"control {c.name}(inout {headers_name} headers, out bool pass_) {{"
-    )
-
+    sig_line = sig.replace("{name}", c.name)
+    lines.append(sig_line + " {")
     for action in c.actions:
         _emit_action(lines, action)
     for table in c.tables:
         _emit_table(lines, table)
-
     lines.append("    apply {")
     for stmt in c.apply_body:
         _emit_block_statement(lines, stmt, indent=8)
@@ -99,16 +96,20 @@ def _emit_ebpf_control(
     lines.append("")
 
 
-def _emit_ebpf_main(lines: list[str], program: nodes.EbpfProgram) -> None:
-    lines.append(
-        f"ebpfFilter({program.parser.name}(), {program.filter.name}()) main;"
-    )
+def _emit_deparser_block(
+    lines: list[str], d: nodes.DeparserDecl, sig: str
+) -> None:
+    sig_line = sig.replace("{name}", d.name)
+    lines.append(sig_line + " {")
+    lines.append("    apply {")
+    for field in d.emit_order:
+        lines.append(f"        pkt.emit({_emit_field_access(field)});")
+    lines.append("    }")
+    lines.append("}")
+    lines.append("")
 
 
-@dataclass
-class _StructNames:
-    headers: str
-    metadata: str
+# --- Shared emitters ---
 
 
 def _emit_header(lines: list[str], h: nodes.HeaderType) -> None:
@@ -126,17 +127,6 @@ def _emit_struct(lines: list[str], s: nodes.StructType) -> None:
             lines.append(f"    bit<{member.type.width}> {member.name};")
         else:
             lines.append(f"    {member.type} {member.name};")
-    lines.append("}")
-    lines.append("")
-
-
-def _emit_parser(lines: list[str], p: nodes.ParserDecl, names: _StructNames) -> None:
-    lines.append(f"parser {p.name}(packet_in pkt,")
-    lines.append(f"                out {names.headers} hdr,")
-    lines.append(f"                inout {names.metadata} meta,")
-    lines.append("                inout standard_metadata_t std_meta) {")
-    for state in p.states:
-        _emit_parser_state(lines, state)
     lines.append("}")
     lines.append("")
 
@@ -159,24 +149,6 @@ def _emit_parser_state(lines: list[str], state: nodes.ParserState) -> None:
                 )
         lines.append("        }")
     lines.append("    }")
-
-
-def _emit_control(lines: list[str], c: nodes.ControlDecl, names: _StructNames) -> None:
-    lines.append(f"control {c.name}(inout {names.headers} hdr,")
-    lines.append(f"                  inout {names.metadata} meta,")
-    lines.append("                  inout standard_metadata_t std_meta) {")
-
-    for action in c.actions:
-        _emit_action(lines, action)
-    for table in c.tables:
-        _emit_table(lines, table)
-
-    lines.append("    apply {")
-    for stmt in c.apply_body:
-        _emit_block_statement(lines, stmt, indent=8)
-    lines.append("    }")
-    lines.append("}")
-    lines.append("")
 
 
 def _emit_action(lines: list[str], a: nodes.ActionDecl) -> None:
@@ -225,120 +197,6 @@ def _emit_table(lines: list[str], t: nodes.TableDecl) -> None:
         lines.append(f"        size = {t.size};")
     lines.append("    }")
     lines.append("")
-
-
-def _emit_deparser(
-    lines: list[str], d: nodes.DeparserDecl, names: _StructNames
-) -> None:
-    lines.append(f"control {d.name}(packet_out pkt, in {names.headers} hdr) {{")
-    lines.append("    apply {")
-    for field in d.emit_order:
-        lines.append(f"        pkt.emit({_emit_field_access(field)});")
-    lines.append("    }")
-    lines.append("}")
-    lines.append("")
-
-
-def _emit_verify_checksum(
-    lines: list[str], vc: nodes.ControlDecl | None, names: _StructNames
-) -> None:
-    if vc is not None:
-        _emit_checksum_control(lines, vc, names)
-    else:
-        lines.append(
-            f"control MyVerifyChecksum(inout {names.headers} hdr,"
-            f" inout {names.metadata} meta) {{"
-        )
-        lines.append("    apply {}")
-        lines.append("}")
-        lines.append("")
-
-
-def _emit_egress(
-    lines: list[str], egress: nodes.ControlDecl | None, names: _StructNames
-) -> None:
-    if egress is not None:
-        _emit_control(lines, egress, names)
-    else:
-        lines.append(f"control MyEgress(inout {names.headers} hdr,")
-        lines.append(f"                  inout {names.metadata} meta,")
-        lines.append("                  inout standard_metadata_t std_meta) {")
-        lines.append("    apply {}")
-        lines.append("}")
-        lines.append("")
-
-
-def _emit_compute_checksum(
-    lines: list[str], cc: nodes.ControlDecl | None, names: _StructNames
-) -> None:
-    if cc is not None:
-        _emit_checksum_control(lines, cc, names)
-    else:
-        lines.append(
-            f"control MyComputeChecksum(inout {names.headers} hdr,"
-            f" inout {names.metadata} meta) {{"
-        )
-        lines.append("    apply {}")
-        lines.append("}")
-        lines.append("")
-
-
-def _emit_checksum_control(
-    lines: list[str], c: nodes.ControlDecl, names: _StructNames
-) -> None:
-    lines.append(
-        f"control {c.name}(inout {names.headers} hdr, inout {names.metadata} meta) {{"
-    )
-    lines.append("    apply {")
-    for stmt in c.apply_body:
-        _emit_checksum_statement(lines, stmt)
-    lines.append("    }")
-    lines.append("}")
-    lines.append("")
-
-
-def _emit_checksum_statement(lines: list[str], stmt: nodes.Statement) -> None:
-    if isinstance(stmt, nodes.ChecksumVerify):
-        _emit_checksum_call(lines, "verify_checksum", stmt)
-    elif isinstance(stmt, nodes.ChecksumUpdate):
-        _emit_checksum_call(lines, "update_checksum", stmt)
-    else:
-        lines.append(f"        {_emit_statement(stmt)}")
-
-
-def _emit_checksum_call(
-    lines: list[str],
-    func_name: str,
-    stmt: nodes.ChecksumVerify | nodes.ChecksumUpdate,
-) -> None:
-    cond = _emit_expression(stmt.condition)
-    data_fields = ", ".join(_emit_field_access(f) for f in stmt.data)
-    checksum = _emit_field_access(stmt.checksum)
-    lines.append(f"        {func_name}(")
-    lines.append(f"            {cond},")
-    lines.append(f"            {{ {data_fields} }},")
-    lines.append(f"            {checksum},")
-    lines.append(f"            HashAlgorithm.{stmt.algo});")
-
-
-def _emit_main(lines: list[str], program: nodes.Program) -> None:
-    egress_name = program.egress.name if program.egress else "MyEgress"
-    vc_name = (
-        program.verify_checksum.name if program.verify_checksum else "MyVerifyChecksum"
-    )
-    cc_name = (
-        program.compute_checksum.name
-        if program.compute_checksum
-        else "MyComputeChecksum"
-    )
-    lines.append("V1Switch(")
-    lines.append(f"    {program.parser.name}(),")
-    lines.append(f"    {vc_name}(),")
-    lines.append(f"    {program.ingress.name}(),")
-    lines.append(f"    {egress_name}(),")
-    lines.append(f"    {cc_name}(),")
-    lines.append(f"    {program.deparser.name}()")
-    lines.append(") main;")
 
 
 def _emit_block_statement(lines: list[str], stmt: nodes.Statement, indent: int) -> None:
@@ -400,6 +258,9 @@ def _emit_expression(expr: nodes.Expression) -> str:
         return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
     if isinstance(expr, nodes.IsValid):
         return f"{_emit_field_access(expr.header_ref)}.isValid()"
+    if isinstance(expr, nodes.ListExpression):
+        inner = ", ".join(_emit_expression(e) for e in expr.elements)
+        return "{ " + inner + " }"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 
