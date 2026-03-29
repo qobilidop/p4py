@@ -185,6 +185,29 @@ class TestBasicRoutingSim:
         assert result.packet[0:6] == b"\x00\x00\x00\x00\xbb\x02"
         assert result.packet[6:12] == b"\x00\x00\x00\x00\xaa\x02"
 
+    def test_checksum_updated_after_ttl_decrement(self):
+        """IPv4 checksum is recomputed after TTL decrement."""
+        result = simulate(
+            self.program,
+            packet=TEST_PACKET,
+            ingress_port=0,
+            table_entries=TABLE_ENTRIES,
+        )
+        assert not result.dropped
+        # Extract output IPv4 header and verify checksum.
+        output_ipv4 = bytearray(result.packet[14:34])
+        stored_csum = (output_ipv4[10] << 8) | output_ipv4[11]
+        # Zero out checksum and recompute.
+        output_ipv4[10] = 0
+        output_ipv4[11] = 0
+        total = 0
+        for i in range(0, len(output_ipv4), 2):
+            total += (output_ipv4[i] << 8) | output_ipv4[i + 1]
+        while total >> 16:
+            total = (total & 0xFFFF) + (total >> 16)
+        expected_csum = (~total) & 0xFFFF
+        assert stored_csum == expected_csum
+
     def test_non_ipv4_dropped(self):
         """Non-IPv4 packet is not processed (no isValid)."""
         arp_packet = (

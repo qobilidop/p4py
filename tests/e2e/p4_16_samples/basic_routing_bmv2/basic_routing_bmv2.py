@@ -142,8 +142,48 @@ def ingress(hdr, meta, std_meta):
         nexthop.apply()
 
 
-# TODO: Add verifyChecksum / computeChecksum controls.
-# Requires: verify_checksum, update_checksum externs.
+@p4.control
+def verifyChecksum(hdr, meta):
+    v1model.verify_checksum(
+        condition=hdr.ipv4.isValid(),
+        data=[
+            hdr.ipv4.version,
+            hdr.ipv4.ihl,
+            hdr.ipv4.diffserv,
+            hdr.ipv4.totalLen,
+            hdr.ipv4.identification,
+            hdr.ipv4.flags,
+            hdr.ipv4.fragOffset,
+            hdr.ipv4.ttl,
+            hdr.ipv4.protocol,
+            hdr.ipv4.srcAddr,
+            hdr.ipv4.dstAddr,
+        ],
+        checksum=hdr.ipv4.hdrChecksum,
+        algo=v1model.HashAlgorithm.csum16,
+    )
+
+
+@p4.control
+def computeChecksum(hdr, meta):
+    v1model.update_checksum(
+        condition=hdr.ipv4.isValid(),
+        data=[
+            hdr.ipv4.version,
+            hdr.ipv4.ihl,
+            hdr.ipv4.diffserv,
+            hdr.ipv4.totalLen,
+            hdr.ipv4.identification,
+            hdr.ipv4.flags,
+            hdr.ipv4.fragOffset,
+            hdr.ipv4.ttl,
+            hdr.ipv4.protocol,
+            hdr.ipv4.srcAddr,
+            hdr.ipv4.dstAddr,
+        ],
+        checksum=hdr.ipv4.hdrChecksum,
+        algo=v1model.HashAlgorithm.csum16,
+    )
 
 
 @p4.deparser
@@ -154,7 +194,9 @@ def DeparserImpl(pkt, hdr):
 
 main = v1model.V1Switch(
     parser=ParserImpl,
+    verify_checksum=verifyChecksum,
     ingress=ingress,
     egress=egress,
+    compute_checksum=computeChecksum,
     deparser=DeparserImpl,
 )

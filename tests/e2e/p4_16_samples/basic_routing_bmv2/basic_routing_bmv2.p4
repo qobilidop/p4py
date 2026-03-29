@@ -50,8 +50,14 @@ parser ParserImpl(packet_in pkt,
     }
 }
 
-control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {
-    apply {}
+control verifyChecksum(inout headers_t hdr, inout metadata_t meta) {
+    apply {
+        verify_checksum(
+            hdr.ipv4.isValid(),
+            { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.diffserv, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr },
+            hdr.ipv4.hdrChecksum,
+            HashAlgorithm.csum16);
+    }
 }
 
 control ingress(inout headers_t hdr,
@@ -173,8 +179,14 @@ control egress(inout headers_t hdr,
     }
 }
 
-control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
-    apply {}
+control computeChecksum(inout headers_t hdr, inout metadata_t meta) {
+    apply {
+        update_checksum(
+            hdr.ipv4.isValid(),
+            { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.diffserv, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr },
+            hdr.ipv4.hdrChecksum,
+            HashAlgorithm.csum16);
+    }
 }
 
 control DeparserImpl(packet_out pkt, in headers_t hdr) {
@@ -186,9 +198,9 @@ control DeparserImpl(packet_out pkt, in headers_t hdr) {
 
 V1Switch(
     ParserImpl(),
-    MyVerifyChecksum(),
+    verifyChecksum(),
     ingress(),
     egress(),
-    MyComputeChecksum(),
+    computeChecksum(),
     DeparserImpl()
 ) main;

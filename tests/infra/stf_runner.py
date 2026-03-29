@@ -161,10 +161,10 @@ def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> No
     for field, value in key_pairs:
         if "/" in value:
             val_str, plen_str = value.rsplit("/", 1)
-            key_dict[field] = int(val_str, 0)
+            key_dict[field] = int(val_str.replace("*", "0"), 0)
             prefix_len_dict[field] = int(plen_str)
         else:
-            key_dict[field] = int(value, 0)
+            key_dict[field] = int(value.replace("*", "0"), 0)
 
     entry: dict = {"key": key_dict, "action": action_name, "args": action_args}
     if prefix_len_dict:
