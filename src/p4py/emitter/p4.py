@@ -268,6 +268,10 @@ def _emit_expression(expr: ir.Expression) -> str:
     if isinstance(expr, ir.ListExpression):
         inner = ", ".join(_emit_expression(e) for e in expr.elements)
         return "{ " + inner + " }"
+    if isinstance(expr, ir.Masked):
+        return f"{_emit_expression(expr.value)} &&& {_emit_expression(expr.mask)}"
+    if isinstance(expr, ir.Wildcard):
+        return "_"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 

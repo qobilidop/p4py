@@ -131,6 +131,19 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
         and len(node.args) == 1
     ):
         return ir.IntLiteral(value=node.args[0].value, hex=True)
+    # p4.mask(value, mask) → Masked
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "mask"
+        and len(node.args) == 2
+    ):
+        return ir.Masked(
+            value=_ast_to_expression(node.args[0]),
+            mask=_ast_to_expression(node.args[1]),
+        )
+    if isinstance(node, ast.Constant) and node.value is None:
+        return ir.Wildcard()
     if isinstance(node, (ast.Attribute, ast.Name)):
         return _ast_to_field_access(node)
     if isinstance(node, ast.BinOp):
@@ -500,7 +513,11 @@ def _compile_const_entries(
     """Compile const_entries = {value: action(args), ...} into ConstEntry nodes."""
     entries = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
-        if isinstance(key_node, ast.Tuple):
+        if key_node is None:
+            values = (ir.Wildcard(),)
+        elif isinstance(key_node, ast.Constant) and key_node.value is None:
+            values = (ir.Wildcard(),)
+        elif isinstance(key_node, ast.Tuple):
             values = tuple(_ast_to_expression(elt) for elt in key_node.elts)
         else:
             values = (_ast_to_expression(key_node),)

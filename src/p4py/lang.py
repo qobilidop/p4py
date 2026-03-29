@@ -111,6 +111,7 @@ class _MatchKind:
 
 exact = _MatchKind("exact")
 lpm = _MatchKind("lpm")
+ternary = _MatchKind("ternary")
 
 
 # --- bool ---
@@ -152,6 +153,11 @@ def literal(value: int, *, width: int) -> int:
 
 def hex(value: int) -> int:
     """Hex-formatted integer literal. Emits as ``0x...`` in P4."""
+    return value
+
+
+def mask(value: int, mask: int) -> int:
+    """Masked value for const entries. Emits as ``value &&& mask`` in P4."""
     return value
 
 

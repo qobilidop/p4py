@@ -82,7 +82,18 @@ class ListExpression:
     elements: tuple[Expression, ...]
 
 
-Expression = FieldAccess | IntLiteral | BoolLiteral | ArithOp | IsValid | ListExpression
+@dataclass(frozen=True)
+class Masked:
+    value: Expression
+    mask: Expression
+
+
+@dataclass(frozen=True)
+class Wildcard:
+    pass
+
+
+Expression = FieldAccess | IntLiteral | BoolLiteral | ArithOp | IsValid | ListExpression | Masked | Wildcard
 
 
 # --- Statements ---
