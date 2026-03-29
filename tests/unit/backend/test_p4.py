@@ -3,6 +3,8 @@
 from absl.testing import absltest
 
 import p4py.lang as p4
+from p4py.arch import ebpf_model
+from p4py.arch.ebpf_model import ebpfFilter, hash_table
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
@@ -135,6 +137,60 @@ class TestEmit(absltest.TestCase):
         self.assertIn("control MyComputeChecksum(", source)
         self.assertIn("V1Switch(", source)
         self.assertIn(") main;", source)
+
+
+class TestEmitEbpf(absltest.TestCase):
+    def test_init_ebpf(self):
+        """Compile and emit a minimal eBPF program."""
+
+        class Ethernet(p4.header):
+            destination: p4.bit(48)
+            source: p4.bit(48)
+            protocol: p4.bit(16)
+
+        class Headers_t(p4.struct):
+            ethernet: Ethernet
+
+        @p4.parser
+        def prs(p, headers: Headers_t):
+            def start():
+                p.extract(headers.ethernet)
+                return p4.ACCEPT
+
+        @p4.control
+        def pipe(headers: Headers_t, accept):
+            @p4.action
+            def match(act: p4.bool):
+                accept = act
+
+            tbl = p4.table(
+                key={headers.ethernet.protocol: p4.exact},
+                actions=[match, p4.NoAction],
+                const_entries={
+                    0x0800: match(True),
+                    0xD000: match(False),
+                },
+                implementation=ebpf_model.hash_table(64),
+            )
+
+            accept = True
+            tbl.apply()
+
+        pipeline = ebpfFilter(parser=prs, filter=pipe)
+        program = compile(pipeline)
+        source = emit(program)
+
+        self.assertIn("#include <core.p4>", source)
+        self.assertIn("#include <ebpf_model.p4>", source)
+        self.assertIn("parser prs(packet_in p, out Headers_t headers)", source)
+        self.assertIn("control pipe(inout Headers_t headers, out bool pass)", source)
+        self.assertIn("bool act", source)
+        self.assertIn("const entries", source)
+        self.assertIn("implementation = hash_table(64)", source)
+        self.assertIn("ebpfFilter(prs(), pipe()) main;", source)
+        # Must NOT contain v1model artifacts.
+        self.assertNotIn("v1model", source)
+        self.assertNotIn("standard_metadata", source)
 
 
 if __name__ == "__main__":

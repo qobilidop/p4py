@@ -11,8 +11,15 @@ from dataclasses import dataclass
 from p4py.ir import nodes
 
 
-def emit(program: nodes.Program) -> str:
+def emit(program: nodes.Program | nodes.EbpfProgram) -> str:
     """Emit a P4-16 source string from an IR Program."""
+    if isinstance(program, nodes.EbpfProgram):
+        return _emit_ebpf(program)
+    return _emit_v1model(program)
+
+
+def _emit_v1model(program: nodes.Program) -> str:
+    """Emit P4-16 source targeting v1model."""
     # Derive the headers and metadata struct names from the program.
     # Convention: the first struct with header-typed members is headers,
     # the last struct is metadata.
@@ -39,6 +46,63 @@ def emit(program: nodes.Program) -> str:
     _emit_main(lines, program)
 
     return "\n".join(lines) + "\n"
+
+
+def _emit_ebpf(program: nodes.EbpfProgram) -> str:
+    """Emit P4-16 source targeting ebpf_model."""
+    headers_name = program.structs[0].name
+
+    lines: list[str] = []
+    lines.append("#include <core.p4>")
+    lines.append("#include <ebpf_model.p4>")
+    lines.append("")
+
+    for h in program.headers:
+        _emit_header(lines, h)
+    for s in program.structs:
+        _emit_struct(lines, s)
+
+    _emit_ebpf_parser(lines, program.parser, headers_name)
+    _emit_ebpf_control(lines, program.filter, headers_name)
+    _emit_ebpf_main(lines, program)
+
+    return "\n".join(lines) + "\n"
+
+
+def _emit_ebpf_parser(
+    lines: list[str], p: nodes.ParserDecl, headers_name: str
+) -> None:
+    lines.append(f"parser {p.name}(packet_in p, out {headers_name} headers) {{")
+    for state in p.states:
+        _emit_parser_state(lines, state)
+    lines.append("}")
+    lines.append("")
+
+
+def _emit_ebpf_control(
+    lines: list[str], c: nodes.ControlDecl, headers_name: str
+) -> None:
+    lines.append(
+        f"control {c.name}(inout {headers_name} headers, out bool pass) {{"
+    )
+
+    for action in c.actions:
+        _emit_action(lines, action)
+    for table in c.tables:
+        _emit_table(lines, table)
+
+    lines.append("    apply {")
+    for stmt in c.apply_body:
+        _emit_block_statement(lines, stmt, indent=8)
+    lines.append("    }")
+    lines.append("}")
+    lines.append("")
+
+
+def _emit_ebpf_main(lines: list[str], program: nodes.EbpfProgram) -> None:
+    lines.append(
+        f"ebpfFilter({program.parser.name}(), {program.filter.name}()) main;"
+    )
 
 
 @dataclass
@@ -116,7 +180,13 @@ def _emit_control(lines: list[str], c: nodes.ControlDecl, names: _StructNames) -
 
 
 def _emit_action(lines: list[str], a: nodes.ActionDecl) -> None:
-    params = ", ".join(f"bit<{p.type.width}> {p.name}" for p in a.params)
+    param_strs = []
+    for p in a.params:
+        if isinstance(p.type, nodes.BoolType):
+            param_strs.append(f"bool {p.name}")
+        else:
+            param_strs.append(f"bit<{p.type.width}> {p.name}")
+    params = ", ".join(param_strs)
     lines.append(f"    action {a.name}({params}) {{")
     for stmt in a.body:
         lines.append(f"        {_emit_statement(stmt)}")
@@ -128,12 +198,23 @@ def _emit_table(lines: list[str], t: nodes.TableDecl) -> None:
     lines.append(f"    table {t.name} {{")
     lines.append("        key = {")
     for key in t.keys:
-        lines.append(f"            {_emit_field_access(key.field)}: {key.match_kind};")
+        lines.append(
+            f"            {_emit_field_access(key.field)}: {key.match_kind};"
+        )
     lines.append("        }")
     lines.append("        actions = {")
     for action_name in t.actions:
         lines.append(f"            {action_name};")
     lines.append("        }")
+    if t.const_entries:
+        lines.append("        const entries = {")
+        for entry in t.const_entries:
+            values = ", ".join(_emit_expression(v) for v in entry.values)
+            args = ", ".join(_emit_expression(a) for a in entry.action_args)
+            lines.append(f"            ({values}) : {entry.action_name}({args});")
+        lines.append("        }")
+    if t.implementation:
+        lines.append(f"        implementation = {t.implementation};")
     if t.default_action:
         if t.default_action_args:
             args = ", ".join(_emit_expression(a) for a in t.default_action_args)
