@@ -1,0 +1,20 @@
+# STF test for wbb.p4 — exercises the acl_wbb_ingress_copy action.
+# Captured from P4Testgen output.
+#
+# The copy action clones the packet to port 2 (via mirroring session 255)
+# and forwards the original out port 0.
+
+# Configure ACL table: match any packet, apply copy action.
+add "ingress.acl_wbb_ingress.acl_wbb_ingress_table" 1 "headers.ethernet.ether_type":0b**************** "headers.ipv4.$valid$":0b* "headers.ipv6.$valid$":0b* "ttl":0b******** "ingress.acl_wbb_ingress.acl_wbb_ingress_copy"()
+
+# Configure clone session 255 → port 2.
+mirroring_add 255 2
+
+# Send a 7-byte packet on port 0.
+packet 0 00000000000000
+
+# Expect the cloned copy on port 2 (no payload check).
+expect 2
+
+# Expect the original packet on port 0.
+expect 0 00000000000000$

@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_library")
 load("//tests/infra:golden_test.bzl", "golden_test")
 load("//tests/infra:p4testgen_test.bzl", "p4testgen_test")
+load("//tests/infra:stf_test.bzl", "stf_test")
 
 py_library(
     name = "wbb",
@@ -13,6 +14,13 @@ golden_test(
     golden_file = "wbb.p4",
     p4_library = ":wbb",
     p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
+)
+
+stf_test(
+    name = "wbb_stf_test",
+    p4_library = ":wbb",
+    p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
+    stf_file = "wbb.stf",
 )
 
 p4testgen_test(

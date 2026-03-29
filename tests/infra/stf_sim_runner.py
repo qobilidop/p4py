@@ -26,39 +26,50 @@ def run_stf_sim_test(module_path: str, stf_path: str) -> bool:
     sim_inputs = stf_to_sim_inputs(stf_text)
 
     passed = True
-    expect_idx = 0
+    sim_results: list[tuple[int, str | None]] = []
     for pkt in sim_inputs.packets:
         result = simulate(
             program,
             packet=pkt.data,
             ingress_port=pkt.port,
             table_entries=sim_inputs.table_entries,
+            clone_session_map=sim_inputs.clone_session_map,
         )
-        if expect_idx >= len(sim_inputs.expects):
-            continue
-
-        expect = sim_inputs.expects[expect_idx]
-        expect_idx += 1
-
-        if expect.pattern is None:
-            continue
-
+        # Clone outputs first, then the original.
+        for clone_port, clone_pkt in result.clone_outputs:
+            sim_results.append((clone_port, clone_pkt.hex()))
         if result.dropped:
-            print(f"FAIL: expected packet on port {expect.port}, got drop")
-            passed = False
-            continue
+            sim_results.append((-1, None))
+        else:
+            sim_results.append((result.egress_port, result.packet.hex()))
 
-        if result.egress_port != expect.port:
-            print(f"FAIL: expected port {expect.port}, got {result.egress_port}")
-            passed = False
-            continue
+    if len(sim_results) != len(sim_inputs.expects):
+        print(
+            f"FAIL: result/expect count mismatch"
+            f" ({len(sim_results)} vs {len(sim_inputs.expects)})"
+        )
+        return False
 
-        actual_hex = result.packet.hex()
-        if not match_hex(actual_hex, expect.pattern):
-            print(f"FAIL: packet mismatch on port {expect.port}")
-            print(f"  expected: {expect.pattern}")
-            print(f"  actual:   {actual_hex}")
-            passed = False
+    for (egress_port, pkt_hex), expect in zip(sim_results, sim_inputs.expects):
+        if expect.pattern is not None:
+            if egress_port != expect.port:
+                print(f"FAIL: expected port {expect.port}, got {egress_port}")
+                passed = False
+            elif pkt_hex is None:
+                print(f"FAIL: expected packet on port {expect.port}, got drop")
+                passed = False
+            elif not match_hex(pkt_hex, expect.pattern):
+                print(f"FAIL: packet mismatch on port {expect.port}")
+                print(f"  expected: {expect.pattern}")
+                print(f"  actual:   {pkt_hex}")
+                passed = False
+        elif expect.pattern is None and egress_port != expect.port:
+            # Expect line with no pattern — just check port.
+            if egress_port == -1:
+                continue  # Dropped packet matches any portless expect.
+            if egress_port != expect.port:
+                print(f"FAIL: expected port {expect.port}, got {egress_port}")
+                passed = False
 
     if passed:
         print("PASS: all expected packets matched")
