@@ -8,3 +8,12 @@ py_test(
         "@pip//absl_py",
     ],
 )
+
+py_test(
+    name = "test_ebpf_model",
+    srcs = ["test_ebpf_model.py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
+)
