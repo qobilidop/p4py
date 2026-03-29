@@ -236,6 +236,38 @@ class TestProgram(absltest.TestCase):
         self.assertEqual(prog.deparser.name, "D")
 
 
+class TestBoolType(absltest.TestCase):
+    def test_frozen(self):
+        bt = nodes.BoolType()
+        with self.assertRaises(AttributeError):
+            bt.x = 1
+
+
+class TestConstEntry(absltest.TestCase):
+    def test_creation(self):
+        entry = nodes.ConstEntry(
+            values=(nodes.IntLiteral(value=0x0800),),
+            action_name="match",
+            action_args=(nodes.BoolLiteral(value=True),),
+        )
+        self.assertEqual(entry.action_name, "match")
+        self.assertEqual(len(entry.values), 1)
+
+
+class TestEbpfProgram(absltest.TestCase):
+    def test_creation(self):
+        prog = nodes.EbpfProgram(
+            headers=(),
+            structs=(),
+            parser=nodes.ParserDecl(name="prs", states=()),
+            filter=nodes.ControlDecl(
+                name="pipe", actions=(), tables=(), apply_body=()
+            ),
+        )
+        self.assertEqual(prog.parser.name, "prs")
+        self.assertEqual(prog.filter.name, "pipe")
+
+
 class TestNodesFrozen(absltest.TestCase):
     def test_nodes_are_frozen(self):
         t = nodes.BitType(width=8)

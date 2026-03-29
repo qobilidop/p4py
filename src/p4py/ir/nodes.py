@@ -17,6 +17,11 @@ class BitType:
 
 
 @dataclass(frozen=True)
+class BoolType:
+    pass
+
+
+@dataclass(frozen=True)
 class HeaderField:
     name: str
     type: BitType
@@ -127,6 +132,13 @@ class SwitchAction:
 
 
 @dataclass(frozen=True)
+class ConstEntry:
+    values: tuple[Expression, ...]
+    action_name: str
+    action_args: tuple[Expression, ...]
+
+
+@dataclass(frozen=True)
 class ChecksumVerify:
     condition: Expression
     data: tuple[FieldAccess, ...]
@@ -194,7 +206,7 @@ class ParserDecl:
 @dataclass(frozen=True)
 class ActionParam:
     name: str
-    type: BitType
+    type: BitType | BoolType
 
 
 @dataclass(frozen=True)
@@ -218,6 +230,8 @@ class TableDecl:
     default_action: str
     default_action_args: tuple[Expression, ...]
     size: int | None = None
+    const_entries: tuple[ConstEntry, ...] = ()
+    implementation: str | None = None
 
 
 # --- Control ---
@@ -253,3 +267,11 @@ class Program:
     egress: ControlDecl | None = None
     verify_checksum: ControlDecl | None = None
     compute_checksum: ControlDecl | None = None
+
+
+@dataclass(frozen=True)
+class EbpfProgram:
+    headers: tuple[HeaderType, ...]
+    structs: tuple[StructType, ...]
+    parser: ParserDecl
+    filter: ControlDecl
