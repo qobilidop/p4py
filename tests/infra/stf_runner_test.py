@@ -2,8 +2,6 @@
 
 from tests.infra.stf_runner import (
     match_hex,
-    parse_stf_add,
-    parse_stf_setdefault,
     parse_stf_string,
     stf_to_sim_inputs,
 )
@@ -60,33 +58,6 @@ class TestMatchHex:
 
     def test_different_lengths(self):
         assert not match_hex("aabb", "aabbcc")
-
-
-class TestParseStfAdd:
-    def test_exact_match_single_param(self):
-        args = "MyIngress.mac_table MyIngress.forward(port:2) hdr.ethernet.dstAddr:0x000000000001"
-        result = parse_stf_add(args)
-        assert (
-            result
-            == "table_add MyIngress.mac_table MyIngress.forward 0x000000000001 => 2"
-        )
-
-    def test_multiple_keys_and_params(self):
-        args = "T A(p1:10, p2:20) k1:0xAA k2:0xBB"
-        result = parse_stf_add(args)
-        assert result == "table_add T A 0xAA 0xBB => 10 20"
-
-
-class TestParseStfSetdefault:
-    def test_no_params(self):
-        args = "MyIngress.mac_table MyIngress.drop()"
-        result = parse_stf_setdefault(args)
-        assert result == "table_set_default MyIngress.mac_table MyIngress.drop"
-
-    def test_with_params(self):
-        args = "T A(p:5)"
-        result = parse_stf_setdefault(args)
-        assert result == "table_set_default T A 5"
 
 
 class TestStfToSimInputs:
