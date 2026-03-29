@@ -117,7 +117,9 @@ def stf_to_sim_inputs(stf_text: str) -> SimInputs:
             expects.append(SimExpect(port=port, pattern=pattern))
 
     return SimInputs(
-        table_entries=table_entries, packets=packets, expects=expects,
+        table_entries=table_entries,
+        packets=packets,
+        expects=expects,
         clone_session_map=clone_session_map,
     )
 

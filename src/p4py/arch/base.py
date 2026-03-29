@@ -56,7 +56,12 @@ class Architecture(ABC):
 
     @abstractmethod
     def process_packet(
-        self, package, engine_cls, packet, ingress_port, table_entries,
+        self,
+        package,
+        engine_cls,
+        packet,
+        ingress_port,
+        table_entries,
         clone_session_map=None,
     ):
         """Simulate a packet through the architecture's pipeline."""

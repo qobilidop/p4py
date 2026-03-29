@@ -202,7 +202,12 @@ class V1ModelArch(Architecture):
             lines.append("")
 
     def process_packet(
-        self, package, engine_cls, packet, ingress_port, table_entries,
+        self,
+        package,
+        engine_cls,
+        packet,
+        ingress_port,
+        table_entries,
         clone_session_map=None,
     ):
         from p4py.sim import SimResult
@@ -250,7 +255,9 @@ class V1ModelArch(Architecture):
 
         if eng.state.metadata["egress_spec"] == _DROP_PORT:
             return SimResult(
-                packet=None, egress_port=_DROP_PORT, dropped=True,
+                packet=None,
+                egress_port=_DROP_PORT,
+                dropped=True,
                 clone_outputs=tuple(clone_outputs),
             )
 
