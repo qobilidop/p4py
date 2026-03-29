@@ -564,8 +564,10 @@ def _compile_control(spec) -> ir.ControlDecl:
         # name = p4.table(...) → TableDecl
         elif isinstance(node, ast.Assign) and _is_table_call(node):
             tables.append(_compile_table(node))
-        # name = p4.bit(W) → LocalVarDecl
-        elif isinstance(node, ast.Assign) and _is_local_var_decl(node):
+        # name = p4.bit(W) or name = p4.bool_(val) → LocalVarDecl
+        elif isinstance(node, ast.Assign) and (
+            _is_local_var_decl(node) or _is_bool_local_var_decl(node)
+        ):
             local_vars.append(_compile_local_var(node))
         # name = v1model.direct_counter(...) → DirectCounter (already collected)
         elif (
@@ -653,9 +655,26 @@ def _is_local_var_decl(node: ast.Assign) -> bool:
     return isinstance(func, ast.Attribute) and func.attr == "bit"
 
 
+def _is_bool_local_var_decl(node: ast.Assign) -> bool:
+    """Check if assignment is name = p4.bool_(True/False)."""
+    if not isinstance(node.value, ast.Call):
+        return False
+    func = node.value.func
+    return isinstance(func, ast.Attribute) and func.attr == "bool_"
+
+
 def _compile_local_var(node: ast.Assign) -> ir.LocalVarDecl:
-    """Compile name = p4.bit(W) to LocalVarDecl."""
+    """Compile name = p4.bit(W) or name = p4.bool_(val) to LocalVarDecl."""
     name = node.targets[0].id
+    func = node.value.func
+    if func.attr == "bool_":
+        init_val = True
+        if node.value.args and isinstance(node.value.args[0], ast.Constant):
+            init_val = node.value.args[0].value
+        return ir.LocalVarDecl(
+            name=name, type=ir.BoolType(), init_value=ir.BoolLiteral(init_val)
+        )
+    # Default: p4.bit(W)
     width = node.value.args[0].value
     return ir.LocalVarDecl(name=name, type=ir.BitType(width), init_value=0)
 

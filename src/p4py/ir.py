@@ -254,8 +254,8 @@ class ConstEntry:
 @dataclass(frozen=True)
 class LocalVarDecl:
     name: str
-    type: BitType
-    init_value: int
+    type: BitType | BoolType | str  # str for named type
+    init_value: Expression | int
 
 
 Statement = (

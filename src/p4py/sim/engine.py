@@ -199,8 +199,14 @@ def _run_control(
 
     # Initialize control-local variables
     for lv in control.local_vars:
-        state.control_locals[lv.name] = lv.init_value
-        state.control_local_widths[lv.name] = lv.type.width
+        if isinstance(lv.init_value, int):
+            state.control_locals[lv.name] = lv.init_value
+        else:
+            state.control_locals[lv.name] = _eval_expression(state, lv.init_value, {})
+        if isinstance(lv.type, ir.BitType):
+            state.control_local_widths[lv.name] = lv.type.width
+        elif isinstance(lv.type, ir.BoolType):
+            state.control_local_widths[lv.name] = 1
 
     for stmt in control.apply_body:
         _exec_control_statement(state, stmt, ctx)

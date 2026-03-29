@@ -93,7 +93,7 @@ def _emit_sub_control(lines: list[str], c: ir.ControlDecl) -> None:
 
     lines.append(sig + " {")
     for lv in c.local_vars:
-        lines.append(f"    bit<{lv.type.width}> {lv.name} = {lv.init_value};")
+        lines.append(f"    {_emit_local_var(lv)}")
         lines.append("")
     for dc in c.direct_counters:
         lines.append(f"    direct_counter(CounterType.{dc.counter_type}) {dc.name};")
@@ -138,7 +138,7 @@ def _emit_control_block(lines: list[str], c: ir.ControlDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", c.name)
     lines.append(sig_line + " {")
     for lv in c.local_vars:
-        lines.append(f"    bit<{lv.type.width}> {lv.name} = {lv.init_value};")
+        lines.append(f"    {_emit_local_var(lv)}")
         lines.append("")
     for dc in c.direct_counters:
         lines.append(f"    direct_counter(CounterType.{dc.counter_type}) {dc.name};")
@@ -302,6 +302,22 @@ def _emit_table(lines: list[str], t: ir.TableDecl) -> None:
         lines.append(f"        size = {t.size};")
     lines.append("    }")
     lines.append("")
+
+
+def _emit_local_var(lv: ir.LocalVarDecl) -> str:
+    """Emit a local variable declaration."""
+    if isinstance(lv.init_value, int):
+        init = str(lv.init_value)
+    else:
+        init = _emit_expression(lv.init_value)
+
+    if isinstance(lv.type, ir.BoolType):
+        return f"bool {lv.name} = {init};"
+    if isinstance(lv.type, ir.BitType):
+        return f"bit<{lv.type.width}> {lv.name} = {init};"
+    if isinstance(lv.type, str):
+        return f"{lv.type} {lv.name} = {init};"
+    raise ValueError(f"Unknown local var type: {lv.type}")
 
 
 def _emit_block_statement(lines: list[str], stmt: ir.Statement, indent: int) -> None:
