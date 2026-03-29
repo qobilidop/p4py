@@ -163,15 +163,16 @@ class struct:
         super().__init_subclass__(**kwargs)
         members: list[tuple[str, type | BitType | _NamedType]] = []
         for name, ann in cls.__annotations__.items():
-            if isinstance(ann, (BitType, BoolType, _NamedType)):
-                members.append((name, ann))
-            elif isinstance(ann, type) and issubclass(ann, (header, struct)):
-                members.append((name, ann))
-            elif (
-                isinstance(ann, type)
-                and hasattr(ann, "_p4_kind")
-                and ann._p4_kind == "enum"
-            ):
+            is_p4_type = (
+                isinstance(ann, (BitType, BoolType, _NamedType))
+                or (isinstance(ann, type) and issubclass(ann, (header, struct)))
+                or (
+                    isinstance(ann, type)
+                    and hasattr(ann, "_p4_kind")
+                    and ann._p4_kind == "enum"
+                )
+            )
+            if is_p4_type:
                 members.append((name, ann))
             else:
                 raise TypeError(

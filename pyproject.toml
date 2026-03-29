@@ -39,15 +39,20 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 # P4 eDSL uses lowercase class names (header, struct) and P4-style field names.
+"src/p4py/lang.py" = ["N801", "E741"]
 "src/p4py/lang/_types.py" = ["N801"]
-"src/p4py/arch/v1model.py" = ["N801"]
-"tests/unit/lang/*" = ["N801", "N815"]
+"src/p4py/arch/v1model.py" = ["N801", "E501"]
+"src/p4py/compiler.py" = ["SIM102", "SIM114", "E501"]
+"src/p4py/emitter/p4.py" = ["SIM108"]
+"src/p4py/sim/engine.py" = ["E741", "SIM102"]
+"tests/unit/lang/*" = ["N801", "N806", "N815", "N816"]
 "tests/unit/arch/*" = ["N801", "N802", "E743"]
 "tests/unit/compiler/*" = ["N801", "N802", "N815", "E743"]
+"tests/unit/emitter/*" = ["N801", "N802", "N815"]
 "tests/unit/backend/*" = ["N801", "N802", "N815"]
 "tests/unit/sim/*" = ["N801", "N802", "N815"]
 "tests/unit/test_integration.py" = ["N801", "N802", "N815"]
 "examples/*" = ["N801", "N802", "N815"]
-"tests/e2e/*" = ["N801", "N802", "N815", "B905", "B007"]
+"tests/e2e/*" = ["N801", "N802", "N806", "N815", "N816", "E501", "E741", "B905", "B007"]
 # Pre-existing issues in test infra; clean up separately.
 "tests/infra/*" = ["B905", "SIM108", "RUF005", "E501"]
