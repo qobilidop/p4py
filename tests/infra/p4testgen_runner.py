@@ -102,6 +102,10 @@ def run_p4testgen_test(module_path: str, p4testgen_path: str) -> bool:
             test_name = os.path.basename(stf_path)
             with open(stf_path) as f:
                 stf_text = f.read()
+            if os.environ.get("P4PY_DUMP_STF"):
+                print(f"--- {test_name} ---")
+                print(stf_text)
+                print(f"--- end {test_name} ---")
             sim_inputs = stf_to_sim_inputs(stf_text)
 
             sim_results: list[tuple[int, str | None]] = []

@@ -149,11 +149,15 @@ def _compile_structs(pipeline) -> tuple[ir.StructType, ...]:
                 _compile_one(ann)
         members = []
         for name, ann in s._p4_members:
-            if (isinstance(ann, type) and issubclass(ann, (p4.header, p4_struct))) or (hasattr(ann, "_p4_kind") and ann._p4_kind in (
-                "typedef",
-                "newtype",
-                "enum",
-            )):
+            if (isinstance(ann, type) and issubclass(ann, (p4.header, p4_struct))) or (
+                hasattr(ann, "_p4_kind")
+                and ann._p4_kind
+                in (
+                    "typedef",
+                    "newtype",
+                    "enum",
+                )
+            ):
                 members.append(ir.StructMember(name, ann._p4_name))
             elif isinstance(ann, p4.BoolType):
                 members.append(ir.StructMember(name, ir.BoolType()))
@@ -524,7 +528,11 @@ def _compile_control(spec) -> ir.ControlDecl:
         elif isinstance(node, ast.Assign) and _is_local_var_decl(node):
             local_vars.append(_compile_local_var(node))
         # name = v1model.direct_counter(...) → DirectCounter (already collected)
-        elif (isinstance(node, ast.Assign) and _is_direct_counter(node)) or (isinstance(node, ast.Assign) and _is_direct_meter(node)) or isinstance(node, ast.Pass):
+        elif (
+            (isinstance(node, ast.Assign) and _is_direct_counter(node))
+            or (isinstance(node, ast.Assign) and _is_direct_meter(node))
+            or isinstance(node, ast.Pass)
+        ):
             continue
         # Everything else → apply body
         else:
@@ -745,7 +753,9 @@ def _compile_const_entries(
     """Compile const_entries = {value: action(args), ...} into ConstEntry nodes."""
     entries = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
-        if key_node is None or (isinstance(key_node, ast.Constant) and key_node.value is None):
+        if key_node is None or (
+            isinstance(key_node, ast.Constant) and key_node.value is None
+        ):
             values = (ir.Wildcard(),)
         elif isinstance(key_node, ast.Tuple):
             values = tuple(_ast_to_expression(elt) for elt in key_node.elts)
