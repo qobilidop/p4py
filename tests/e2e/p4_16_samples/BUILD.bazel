@@ -1,1 +1,30 @@
-# p4_16_samples test subpackages.
+load("@rules_python//python:defs.bzl", "py_library")
+load("//tests/infra:golden_test.bzl", "golden_test")
+load("//tests/infra:p4testgen_test.bzl", "p4testgen_test")
+load("//tests/infra:stf_test.bzl", "stf_test")
+
+py_library(
+    name = "basic_routing_bmv2",
+    srcs = ["basic_routing_bmv2.py"],
+    deps = ["//src/p4py"],
+)
+
+golden_test(
+    name = "basic_routing_bmv2_golden_test",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
+    p4_library = ":basic_routing_bmv2",
+    golden_file = "basic_routing_bmv2.p4",
+)
+
+stf_test(
+    name = "basic_routing_bmv2_stf_test",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
+    p4_library = ":basic_routing_bmv2",
+    stf_file = "basic_routing_bmv2.stf",
+)
+
+p4testgen_test(
+    name = "basic_routing_bmv2_p4testgen_test",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
+    p4_library = ":basic_routing_bmv2",
+)
