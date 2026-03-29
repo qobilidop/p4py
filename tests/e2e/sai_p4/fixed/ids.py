@@ -24,3 +24,15 @@ IP_PROTOCOL_ICMPV6 = p4.const(_ip_protocol_t, 0x3A, "IP_PROTOCOL_ICMPV6")
 IP_PROTOCOL_V6_EXTENSION_HOP_BY_HOP = p4.const(
     _ip_protocol_t, 0x00, "IP_PROTOCOL_V6_EXTENSION_HOP_BY_HOP"
 )
+
+# BMV2 instance type constants (from v1model standard_metadata).
+_instance_type_t = p4.typedef(p4.bit(32), "instance_type_t")
+PKT_INSTANCE_TYPE_INGRESS_CLONE = p4.const(
+    _instance_type_t, 1, "PKT_INSTANCE_TYPE_INGRESS_CLONE"
+)
+PKT_INSTANCE_TYPE_EGRESS_CLONE = p4.const(
+    _instance_type_t, 2, "PKT_INSTANCE_TYPE_EGRESS_CLONE"
+)
+PKT_INSTANCE_TYPE_REPLICATION = p4.const(
+    _instance_type_t, 5, "PKT_INSTANCE_TYPE_REPLICATION"
+)

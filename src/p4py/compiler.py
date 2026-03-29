@@ -248,6 +248,14 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
             type_name = type_arg.id
         elif isinstance(type_arg, ast.Attribute):
             type_name = type_arg.attr
+        elif (
+            isinstance(type_arg, ast.Call)
+            and isinstance(type_arg.func, ast.Attribute)
+            and type_arg.func.attr == "bit"
+            and type_arg.args
+            and isinstance(type_arg.args[0], ast.Constant)
+        ):
+            type_name = f"bit<{type_arg.args[0].value}>"
         else:
             raise ValueError(f"Unsupported cast type: {ast.dump(type_arg)}")
         inner_expr = _ast_to_expression(node.args[1])

@@ -53,6 +53,6 @@ select = [
 "tests/unit/sim/*" = ["N801", "N802", "N815"]
 "tests/unit/test_integration.py" = ["N801", "N802", "N815"]
 "examples/*" = ["N801", "N802", "N815"]
-"tests/e2e/*" = ["N801", "N802", "N806", "N815", "N816", "E501", "E741", "B905", "B007"]
+"tests/e2e/*" = ["N801", "N802", "N806", "N815", "N816", "E501", "E741", "B905", "B007", "SIM201"]
 # Pre-existing issues in test infra; clean up separately.
 "tests/infra/*" = ["B905", "SIM108", "RUF005", "E501"]

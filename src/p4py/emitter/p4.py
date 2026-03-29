@@ -424,11 +424,22 @@ def _emit_expression(expr: ir.Expression) -> str:
     if isinstance(expr, ir.ConstRef):
         return expr.name
     if isinstance(expr, ir.UnaryOp):
-        return f"!{_emit_expression(expr.operand)}"
+        inner = _emit_expression(expr.operand)
+        if isinstance(expr.operand, (ir.LogicalOp, ir.CompareOp)):
+            inner = f"({inner})"
+        return f"!{inner}"
     if isinstance(expr, ir.CompareOp):
         return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
     if isinstance(expr, ir.LogicalOp):
-        return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
+        left = _emit_expression(expr.left)
+        right = _emit_expression(expr.right)
+        # Parenthesize lower-precedence || inside &&.
+        if expr.op == "&&":
+            if isinstance(expr.left, ir.LogicalOp) and expr.left.op == "||":
+                left = f"({left})"
+            if isinstance(expr.right, ir.LogicalOp) and expr.right.op == "||":
+                right = f"({right})"
+        return f"{left} {expr.op} {right}"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 
