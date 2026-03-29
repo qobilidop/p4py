@@ -230,14 +230,18 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> ir.Statement:
     # If/else
     if isinstance(node, ast.If):
         condition = _ast_to_expression(node.test)
-        if not isinstance(condition, ir.IsValid):
-            raise ValueError("if conditions must be hdr.x.isValid()")
         then_body = tuple(
             s for n in node.body if (s := _ast_to_statement(n, params)) is not None
         )
-        else_body = tuple(
-            s for n in node.orelse if (s := _ast_to_statement(n, params)) is not None
-        )
+        else_body = []
+        for n in node.orelse:
+            if isinstance(n, ast.If):
+                else_body.append(_ast_to_statement(n, params))
+            else:
+                s = _ast_to_statement(n, params)
+                if s is not None:
+                    else_body.append(s)
+        else_body = tuple(else_body)
         return ir.IfElse(condition=condition, then_body=then_body, else_body=else_body)
 
     # match table.apply(): case "action": ... → SwitchAction
@@ -414,6 +418,9 @@ def _compile_control(spec) -> ir.ControlDecl:
     actions: list[ir.ActionDecl] = []
     tables: list[ir.TableDecl] = []
     apply_body: list[ir.Statement] = []
+    direct_counters: list[ir.DirectCounter] = []
+    direct_meters: list[ir.DirectMeter] = []
+    local_vars: list[ir.LocalVarDecl] = []
 
     for node in func_def.body:
         # @p4.action decorated function → ActionDecl
@@ -422,6 +429,15 @@ def _compile_control(spec) -> ir.ControlDecl:
         # name = p4.table(...) → TableDecl
         elif isinstance(node, ast.Assign) and _is_table_call(node):
             tables.append(_compile_table(node))
+        # name = p4.bit(W) → LocalVarDecl
+        elif isinstance(node, ast.Assign) and _is_local_var_decl(node):
+            local_vars.append(_compile_local_var(node))
+        # name = v1model.direct_counter(...) → DirectCounter
+        elif isinstance(node, ast.Assign) and _is_direct_counter(node):
+            direct_counters.append(_compile_direct_counter(node))
+        # name = v1model.direct_meter(...) → DirectMeter
+        elif isinstance(node, ast.Assign) and _is_direct_meter(node):
+            direct_meters.append(_compile_direct_meter(node))
         # pass statement — skip
         elif isinstance(node, ast.Pass):
             continue
@@ -435,6 +451,9 @@ def _compile_control(spec) -> ir.ControlDecl:
         tables=tuple(tables),
         apply_body=tuple(apply_body),
         param_names=_param_names_ordered(func_def),
+        direct_counters=tuple(direct_counters),
+        direct_meters=tuple(direct_meters),
+        local_vars=tuple(local_vars),
     )
 
 
@@ -489,6 +508,57 @@ def _is_table_call(node: ast.Assign) -> bool:
     return isinstance(func, ast.Attribute) and func.attr == "table"
 
 
+def _is_local_var_decl(node: ast.Assign) -> bool:
+    """Check if assignment is name = p4.bit(W) (local variable declaration)."""
+    if not isinstance(node.value, ast.Call):
+        return False
+    func = node.value.func
+    return isinstance(func, ast.Attribute) and func.attr == "bit"
+
+
+def _compile_local_var(node: ast.Assign) -> ir.LocalVarDecl:
+    """Compile name = p4.bit(W) to LocalVarDecl."""
+    name = node.targets[0].id
+    width = node.value.args[0].value
+    return ir.LocalVarDecl(name=name, type=ir.BitType(width), init_value=0)
+
+
+def _is_direct_counter(node: ast.Assign) -> bool:
+    """Check if assignment is name = v1model.direct_counter(...)."""
+    if not isinstance(node.value, ast.Call):
+        return False
+    func = node.value.func
+    return isinstance(func, ast.Attribute) and func.attr == "direct_counter"
+
+
+def _compile_direct_counter(node: ast.Assign) -> ir.DirectCounter:
+    """Compile name = v1model.direct_counter(...) to DirectCounter."""
+    name = node.targets[0].id
+    counter_type = node.value.args[0].value
+    return ir.DirectCounter(name=name, counter_type=counter_type)
+
+
+def _is_direct_meter(node: ast.Assign) -> bool:
+    """Check if assignment is name = v1model.direct_meter(...)."""
+    if not isinstance(node.value, ast.Call):
+        return False
+    func = node.value.func
+    return isinstance(func, ast.Attribute) and func.attr == "direct_meter"
+
+
+def _compile_direct_meter(node: ast.Assign) -> ir.DirectMeter:
+    """Compile name = v1model.direct_meter(...) to DirectMeter."""
+    name = node.targets[0].id
+    call = node.value
+    result_type_name = (
+        call.args[0].id if isinstance(call.args[0], ast.Name) else call.args[0].attr
+    )
+    meter_type = call.args[1].value
+    return ir.DirectMeter(
+        name=name, result_type_name=result_type_name, meter_type=meter_type
+    )
+
+
 def _compile_table(node: ast.Assign) -> ir.TableDecl:
     """Compile name = p4.table(...) into a TableDecl."""
     name = node.targets[0].id
@@ -501,6 +571,8 @@ def _compile_table(node: ast.Assign) -> ir.TableDecl:
     size = None
     const_entries: tuple[ir.ConstEntry, ...] = ()
     implementation: str | None = None
+    counters = None
+    meters = None
 
     for kw in call.keywords:
         if kw.arg == "key":
@@ -531,6 +603,12 @@ def _compile_table(node: ast.Assign) -> ir.TableDecl:
             size = kw.value.value
         elif kw.arg == "const_entries":
             const_entries = _compile_const_entries(kw.value)
+        elif kw.arg == "counters":
+            if isinstance(kw.value, ast.Name):
+                counters = kw.value.id
+        elif kw.arg == "meters":
+            if isinstance(kw.value, ast.Name):
+                meters = kw.value.id
         elif kw.arg == "implementation":
             implementation = _compile_implementation(kw.value)
 
@@ -543,6 +621,8 @@ def _compile_table(node: ast.Assign) -> ir.TableDecl:
         size=size,
         const_entries=const_entries,
         implementation=implementation,
+        counters=counters,
+        meters=meters,
     )
 
 
@@ -550,7 +630,15 @@ def _compile_table_keys(dict_node: ast.Dict) -> tuple[ir.TableKey, ...]:
     """Compile a dict literal {field: match_kind} into TableKeys."""
     keys = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
-        field = _ast_to_field_access(key_node)
+        # Handle isValid() as table key
+        if (
+            isinstance(key_node, ast.Call)
+            and isinstance(key_node.func, ast.Attribute)
+            and key_node.func.attr == "isValid"
+        ):
+            field = ir.IsValid(header_ref=_ast_to_field_access(key_node.func.value))
+        else:
+            field = _ast_to_field_access(key_node)
         # p4.exact → "exact"
         if isinstance(val_node, ast.Attribute):
             match_kind = val_node.attr

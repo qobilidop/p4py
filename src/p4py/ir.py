@@ -189,7 +189,7 @@ class TableApply:
 
 @dataclass(frozen=True)
 class IfElse:
-    condition: IsValid  # Conditions restricted to IsValid only (hdr.x.isValid())
+    condition: Expression  # IsValid or other boolean expression
     then_body: tuple[Statement, ...]
     else_body: tuple[Statement, ...]
 
@@ -213,6 +213,13 @@ class ConstEntry:
     action_args: tuple[Expression, ...]
 
 
+@dataclass(frozen=True)
+class LocalVarDecl:
+    name: str
+    type: BitType
+    init_value: int
+
+
 Statement = (
     Assignment
     | MethodCall
@@ -221,6 +228,7 @@ Statement = (
     | TableApply
     | IfElse
     | SwitchAction
+    | LocalVarDecl
 )
 
 
@@ -276,7 +284,7 @@ class ActionDecl:
 
 @dataclass(frozen=True)
 class TableKey:
-    field: FieldAccess
+    field: FieldAccess | IsValid
     match_kind: str
 
 
@@ -290,6 +298,8 @@ class TableDecl:
     size: int | None = None
     const_entries: tuple[ConstEntry, ...] = ()
     implementation: str | None = None
+    counters: str | None = None
+    meters: str | None = None
 
 
 # --- Control ---
@@ -302,6 +312,9 @@ class ControlDecl:
     tables: tuple[TableDecl, ...]
     apply_body: tuple[Statement, ...]
     param_names: tuple[str, ...] = ()
+    direct_counters: tuple[DirectCounter, ...] = ()
+    direct_meters: tuple[DirectMeter, ...] = ()
+    local_vars: tuple[LocalVarDecl, ...] = ()
 
 
 # --- Deparser ---

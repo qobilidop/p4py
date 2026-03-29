@@ -91,6 +91,20 @@ def _emit_parser_block(lines: list[str], p: ir.ParserDecl, sig: str) -> None:
 def _emit_control_block(lines: list[str], c: ir.ControlDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", c.name)
     lines.append(sig_line + " {")
+    for lv in c.local_vars:
+        lines.append(f"    bit<{lv.type.width}> {lv.name} = {lv.init_value};")
+        lines.append("")
+    for dc in c.direct_counters:
+        lines.append(
+            f"    direct_counter(CounterType.{dc.counter_type}) {dc.name};"
+        )
+        lines.append("")
+    for dm in c.direct_meters:
+        lines.append(
+            f"    direct_meter<{dm.result_type_name}>"
+            f"(MeterType.{dm.meter_type}) {dm.name};"
+        )
+        lines.append("")
     for action in c.actions:
         _emit_action(lines, action)
     for table in c.tables:
@@ -206,7 +220,14 @@ def _emit_table(lines: list[str], t: ir.TableDecl) -> None:
     lines.append(f"    table {t.name} {{")
     lines.append("        key = {")
     for key in t.keys:
-        lines.append(f"            {_emit_field_access(key.field)}: {key.match_kind};")
+        if isinstance(key.field, ir.IsValid):
+            lines.append(
+                f"            {_emit_expression(key.field)}: {key.match_kind};"
+            )
+        else:
+            lines.append(
+                f"            {_emit_field_access(key.field)}: {key.match_kind};"
+            )
     lines.append("        }")
     lines.append("        actions = {")
     for action_name in t.actions:
@@ -227,6 +248,10 @@ def _emit_table(lines: list[str], t: ir.TableDecl) -> None:
             lines.append(f"        default_action = {t.default_action}({args});")
         else:
             lines.append(f"        default_action = {t.default_action}();")
+    if t.meters:
+        lines.append(f"        meters = {t.meters};")
+    if t.counters:
+        lines.append(f"        counters = {t.counters};")
     if t.size is not None:
         lines.append(f"        size = {t.size};")
     lines.append("    }")
@@ -241,11 +266,28 @@ def _emit_block_statement(lines: list[str], stmt: ir.Statement, indent: int) -> 
         lines.append(f"{pad}if ({cond}) {{")
         for s in stmt.then_body:
             _emit_block_statement(lines, s, indent + 4)
-        if stmt.else_body:
+        if (
+            stmt.else_body
+            and len(stmt.else_body) == 1
+            and isinstance(stmt.else_body[0], ir.IfElse)
+        ):
+            inner = stmt.else_body[0]
+            inner_cond = _emit_expression(inner.condition)
+            lines.append(f"{pad}}} else if ({inner_cond}) {{")
+            for s in inner.then_body:
+                _emit_block_statement(lines, s, indent + 4)
+            if inner.else_body:
+                lines.append(f"{pad}}} else {{")
+                for s in inner.else_body:
+                    _emit_block_statement(lines, s, indent + 4)
+            lines.append(f"{pad}}}")
+        elif stmt.else_body:
             lines.append(f"{pad}}} else {{")
             for s in stmt.else_body:
                 _emit_block_statement(lines, s, indent + 4)
-        lines.append(f"{pad}}}")
+            lines.append(f"{pad}}}")
+        else:
+            lines.append(f"{pad}}}")
     elif isinstance(stmt, ir.SwitchAction):
         lines.append(f"{pad}switch ({stmt.table_name}.apply().action_run) {{")
         for case in stmt.cases:
