@@ -31,7 +31,33 @@ class BitType:
         return f"bit({self.width})"
 
 
+# --- _NamedType: typedef and newtype ---
+
+
+class _NamedType:
+    """A named alias or distinct type wrapping a BitType."""
+
+    def __init__(self, underlying: BitType, name: str, kind: str) -> None:
+        self._p4_underlying = underlying
+        self._p4_name = name
+        self._p4_kind = kind
+        self.width = underlying.width
+
+    def __repr__(self) -> str:
+        return self._p4_name
+
+
+def typedef(underlying: BitType, name: str) -> _NamedType:
+    """Create a P4 typedef: typedef bit<W> name."""
+    return _NamedType(underlying, name, "typedef")
+
+
 # --- header ---
+
+
+def _is_bit_like(ann: object) -> bool:
+    """Return True if ann is a BitType or a _NamedType (typedef/newtype)."""
+    return isinstance(ann, (BitType, _NamedType))
 
 
 class header:
@@ -47,9 +73,9 @@ class header:
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        fields: list[tuple[str, BitType]] = []
+        fields: list[tuple[str, BitType | _NamedType]] = []
         for name, ann in cls.__annotations__.items():
-            if not isinstance(ann, BitType):
+            if not _is_bit_like(ann):
                 raise TypeError(
                     f"Header field '{name}' must be annotated with bit(W), got {ann!r}"
                 )
@@ -58,7 +84,7 @@ class header:
             raise TypeError(f"Header '{cls.__name__}' must have at least one field")
         cls._p4_name = cls.__name__
         cls._p4_fields = tuple(fields)
-        cls._p4_bit_width = sum(f.width for _, f in fields)
+        cls._p4_bit_width = sum(ann.width for _, ann in fields)
 
 
 # --- struct ---
@@ -81,11 +107,13 @@ class struct:
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
-        members: list[tuple[str, type | BitType]] = []
+        members: list[tuple[str, type | BitType | _NamedType]] = []
         for name, ann in cls.__annotations__.items():
-            if isinstance(ann, BitType) or (
-                isinstance(ann, type) and issubclass(ann, (header, struct))
-            ):
+            if isinstance(ann, (BitType, BoolType, _NamedType)):
+                members.append((name, ann))
+            elif isinstance(ann, type) and issubclass(ann, (header, struct)):
+                members.append((name, ann))
+            elif isinstance(ann, type) and hasattr(ann, "_p4_kind") and ann._p4_kind == "enum":
                 members.append((name, ann))
             else:
                 raise TypeError(

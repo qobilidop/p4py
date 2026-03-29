@@ -45,6 +45,15 @@ class StructType:
     members: tuple[StructMember, ...]
 
 
+# --- Declarations ---
+
+
+@dataclass(frozen=True)
+class TypedefDecl:
+    name: str
+    type: BitType
+
+
 # --- Expressions ---
 
 
