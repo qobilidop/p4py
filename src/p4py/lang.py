@@ -249,6 +249,11 @@ def mask(value: int, mask: int) -> int:
     return value
 
 
+def cast(type_ref, value):
+    """Type cast expression. Emits as ``(type) expr`` in P4."""
+    return value
+
+
 ACCEPT = "accept"
 REJECT = "reject"
 
