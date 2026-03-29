@@ -28,3 +28,10 @@ p4testgen_test(
     p4_library = ":wbb",
     p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
 )
+
+golden_test(
+    name = "tor_golden_test",
+    golden_file = "tor.p4",
+    p4_library = ":wbb",
+    p4_module = "tests.e2e.sai_p4.instantiations.google.tor",
+)
