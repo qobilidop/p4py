@@ -322,7 +322,7 @@ class ActionDecl:
 
 @dataclass(frozen=True)
 class TableKey:
-    field: FieldAccess | IsValid
+    field: FieldAccess | IsValid | IntLiteral  # IntLiteral for dummy keys like 1w1
     match_kind: str
 
 

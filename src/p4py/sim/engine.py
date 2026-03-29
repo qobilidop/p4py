@@ -274,6 +274,11 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
             lookup_key[field_path] = _eval_expression(state, table_key.field, {})
             match_kinds[field_path] = table_key.match_kind
             field_widths[field_path] = 1  # isValid() returns a 1-bit value
+        elif isinstance(table_key.field, ir.IntLiteral):
+            field_path = f"{table_key.field.width}w{table_key.field.value}"
+            lookup_key[field_path] = table_key.field.value
+            match_kinds[field_path] = table_key.match_kind
+            field_widths[field_path] = table_key.field.width or 32
         else:
             field_path = ".".join(table_key.field.path)
             lookup_key[field_path] = _eval_expression(state, table_key.field, {})

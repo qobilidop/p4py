@@ -795,6 +795,12 @@ def _compile_table_keys(dict_node: ast.Dict) -> tuple[ir.TableKey, ...]:
             and key_node.func.attr == "isValid"
         ):
             field = ir.IsValid(header_ref=_ast_to_field_access(key_node.func.value))
+        elif (
+            isinstance(key_node, ast.Call)
+            and isinstance(key_node.func, ast.Attribute)
+            and key_node.func.attr == "literal"
+        ):
+            field = _ast_to_expression(key_node)
         else:
             field = _ast_to_field_access(key_node)
         # p4.exact → "exact"
