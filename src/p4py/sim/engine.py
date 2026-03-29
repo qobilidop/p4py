@@ -266,7 +266,7 @@ def _build_const_entry_args(
     if action_decl is None or not entry.action_args:
         return {}
     args = {}
-    for param, arg_expr in zip(action_decl.params, entry.action_args):
+    for param, arg_expr in zip(action_decl.params, entry.action_args, strict=False):
         if isinstance(arg_expr, nodes.BoolLiteral):
             args[param.name] = int(arg_expr.value)
         elif isinstance(arg_expr, nodes.IntLiteral):

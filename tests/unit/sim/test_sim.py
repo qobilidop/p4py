@@ -586,7 +586,11 @@ class TestParserRejectDetection(absltest.TestCase):
     def test_run_parser_returns_accept(self):
         """_run_parser returns 'accept' for a valid packet."""
         from p4py.ir import nodes
-        from p4py.sim.engine import _HeaderInstance, _SimState, _run_parser
+        from p4py.sim.engine import (
+            _HeaderInstance,
+            _run_parser,
+            _SimState,
+        )
 
         eth_type = nodes.HeaderType(
             name="ethernet_t",
@@ -624,9 +628,12 @@ class TestParserRejectDetection(absltest.TestCase):
         self.assertEqual(result, "accept")
 
     def test_run_parser_returns_accept_on_short_packet(self):
-        """_run_parser returns 'accept' even with short packet (header stays invalid)."""
+        """_run_parser returns 'accept' even with short packet.
+
+        Header stays invalid when packet is too short.
+        """
         from p4py.ir import nodes
-        from p4py.sim.engine import _HeaderInstance, _SimState, _run_parser
+        from p4py.sim.engine import _HeaderInstance, _run_parser, _SimState
 
         eth_type = nodes.HeaderType(
             name="ethernet_t",

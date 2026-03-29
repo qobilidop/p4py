@@ -123,10 +123,17 @@ class TestV1ModelArch(absltest.TestCase):
         arch = V1ModelArch()
         self.assertLen(arch.pipeline, 6)
         names = [s.name for s in arch.pipeline]
-        self.assertEqual(names, [
-            "parser", "verify_checksum", "ingress",
-            "egress", "compute_checksum", "deparser",
-        ])
+        self.assertEqual(
+            names,
+            [
+                "parser",
+                "verify_checksum",
+                "ingress",
+                "egress",
+                "compute_checksum",
+                "deparser",
+            ],
+        )
 
     def test_optional_blocks(self):
         arch = V1ModelArch()
@@ -161,9 +168,12 @@ class TestV1ModelArch(absltest.TestCase):
     def test_main_instantiation(self):
         arch = V1ModelArch()
         block_names = {
-            "parser": "MyParser", "verify_checksum": "MyVerifyChecksum",
-            "ingress": "MyIngress", "egress": "MyEgress",
-            "compute_checksum": "MyComputeChecksum", "deparser": "MyDeparser",
+            "parser": "MyParser",
+            "verify_checksum": "MyVerifyChecksum",
+            "ingress": "MyIngress",
+            "egress": "MyEgress",
+            "compute_checksum": "MyComputeChecksum",
+            "deparser": "MyDeparser",
         }
         main = arch.main_instantiation(block_names)
         self.assertIn("V1Switch(", main)

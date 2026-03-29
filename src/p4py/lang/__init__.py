@@ -18,13 +18,15 @@ from p4py.lang._types import (
     BoolType,
     NoAction,
     bit,
-    bool_ as bool,
     exact,
     header,
     hex,
     literal,
     lpm,
     struct,
+)
+from p4py.lang._types import (
+    bool_ as bool,
 )
 
 __all__ = [

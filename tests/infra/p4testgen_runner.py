@@ -48,19 +48,21 @@ def _run_p4testgen(
         # eBPF model includes are in a separate directory.
         ebpf_include = os.path.join(root, "backends", "ebpf", "p4include")
         cmd.extend(["-I", ebpf_include])
-    cmd.extend([
-        "--target",
-        target,
-        "--arch",
-        arch,
-        "--test-backend",
-        "stf",
-        "--max-tests",
-        "0",
-        "--out-dir",
-        out_dir,
-        p4_path,
-    ])
+    cmd.extend(
+        [
+            "--target",
+            target,
+            "--arch",
+            arch,
+            "--test-backend",
+            "stf",
+            "--max-tests",
+            "0",
+            "--out-dir",
+            out_dir,
+            p4_path,
+        ]
+    )
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"p4testgen failed:\n{result.stderr}")

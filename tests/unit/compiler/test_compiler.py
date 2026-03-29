@@ -371,7 +371,7 @@ class TestCompileEbpf(absltest.TestCase):
         def pipe(headers: Headers_t, pass_):
             @p4.action
             def match(act: p4.bool):
-                pass_ = act
+                pass_ = act  # noqa: F841
 
             tbl = p4.table(
                 key={headers.ethernet.protocol: p4.exact},
@@ -383,7 +383,7 @@ class TestCompileEbpf(absltest.TestCase):
                 implementation=ebpf_model.hash_table(64),
             )
 
-            pass_ = True
+            pass_ = True  # noqa: F841
             tbl.apply()
 
         pipeline = ebpf_model.ebpfFilter(parser=prs, filter=pipe)

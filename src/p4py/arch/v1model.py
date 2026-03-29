@@ -10,7 +10,6 @@ import p4py.lang as p4
 from p4py.arch.base import Architecture, BlockSpec
 from p4py.lang import _Spec
 
-
 _DROP_PORT = 511
 
 

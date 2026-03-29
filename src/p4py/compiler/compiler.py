@@ -32,7 +32,10 @@ def compile(pipeline) -> nodes.Package:
         blocks.append(nodes.BlockEntry(name=spec.name, kind=spec.kind, decl=decl))
 
     return nodes.Package(
-        arch=arch, headers=headers_ir, structs=structs_ir, blocks=tuple(blocks),
+        arch=arch,
+        headers=headers_ir,
+        structs=structs_ir,
+        blocks=tuple(blocks),
     )
 
 
@@ -399,7 +402,8 @@ def _compile_action(
                 )
             else:
                 raise ValueError(
-                    f"Action param '{arg.arg}' must be annotated with p4.bit(W) or p4.bool"
+                    f"Action param '{arg.arg}' must be annotated"
+                    " with p4.bit(W) or p4.bool"
                 )
 
     body = tuple(
@@ -504,9 +508,7 @@ def _compile_const_entries(
             action_name = val_node.func.id
             action_args = tuple(_ast_to_expression(a) for a in val_node.args)
         else:
-            raise ValueError(
-                f"Unsupported const_entries value: {ast.dump(val_node)}"
-            )
+            raise ValueError(f"Unsupported const_entries value: {ast.dump(val_node)}")
         entries.append(
             nodes.ConstEntry(
                 values=values, action_name=action_name, action_args=action_args

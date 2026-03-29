@@ -68,9 +68,7 @@ def _boilerplate_name(block_name: str) -> str:
 # --- Generic block emitters ---
 
 
-def _emit_parser_block(
-    lines: list[str], p: nodes.ParserDecl, sig: str
-) -> None:
+def _emit_parser_block(lines: list[str], p: nodes.ParserDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", p.name)
     lines.append(sig_line + " {")
     for state in p.states:
@@ -79,9 +77,7 @@ def _emit_parser_block(
     lines.append("")
 
 
-def _emit_control_block(
-    lines: list[str], c: nodes.ControlDecl, sig: str
-) -> None:
+def _emit_control_block(lines: list[str], c: nodes.ControlDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", c.name)
     lines.append(sig_line + " {")
     for action in c.actions:
@@ -96,9 +92,7 @@ def _emit_control_block(
     lines.append("")
 
 
-def _emit_deparser_block(
-    lines: list[str], d: nodes.DeparserDecl, sig: str
-) -> None:
+def _emit_deparser_block(lines: list[str], d: nodes.DeparserDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", d.name)
     lines.append(sig_line + " {")
     lines.append("    apply {")
@@ -170,9 +164,7 @@ def _emit_table(lines: list[str], t: nodes.TableDecl) -> None:
     lines.append(f"    table {t.name} {{")
     lines.append("        key = {")
     for key in t.keys:
-        lines.append(
-            f"            {_emit_field_access(key.field)}: {key.match_kind};"
-        )
+        lines.append(f"            {_emit_field_access(key.field)}: {key.match_kind};")
     lines.append("        }")
     lines.append("        actions = {")
     for action_name in t.actions:

@@ -266,10 +266,12 @@ class TestBlockEntry(absltest.TestCase):
 
 class TestListExpression(absltest.TestCase):
     def test_list_expression(self):
-        le = nodes.ListExpression(elements=(
-            nodes.FieldAccess(path=("hdr", "ipv4", "version")),
-            nodes.FieldAccess(path=("hdr", "ipv4", "ihl")),
-        ))
+        le = nodes.ListExpression(
+            elements=(
+                nodes.FieldAccess(path=("hdr", "ipv4", "version")),
+                nodes.FieldAccess(path=("hdr", "ipv4", "ihl")),
+            )
+        )
         self.assertLen(le.elements, 2)
 
 

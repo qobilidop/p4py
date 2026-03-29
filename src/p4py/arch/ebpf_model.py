@@ -96,7 +96,7 @@ _EBPF_ARCH = EbpfFilterArch()
 
 
 @dataclass
-class ebpfFilter:
+class ebpfFilter:  # noqa: N801
     """eBPF filter pipeline with field order matching ebpf_model.p4.
 
     Header types are inferred from the parser's type annotations

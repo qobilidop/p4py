@@ -4,7 +4,7 @@ from absl.testing import absltest
 
 import p4py.lang as p4
 from p4py.arch import ebpf_model
-from p4py.arch.ebpf_model import ebpfFilter, hash_table
+from p4py.arch.ebpf_model import ebpfFilter
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
@@ -161,7 +161,7 @@ class TestEmitEbpf(absltest.TestCase):
         def pipe(headers: Headers_t, pass_):
             @p4.action
             def match(act: p4.bool):
-                pass_ = act
+                pass_ = act  # noqa: F841
 
             tbl = p4.table(
                 key={headers.ethernet.protocol: p4.exact},
@@ -173,7 +173,7 @@ class TestEmitEbpf(absltest.TestCase):
                 implementation=ebpf_model.hash_table(64),
             )
 
-            pass_ = True
+            pass_ = True  # noqa: F841
             tbl.apply()
 
         pipeline = ebpfFilter(parser=prs, filter=pipe)
