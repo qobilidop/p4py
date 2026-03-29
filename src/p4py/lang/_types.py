@@ -108,6 +108,37 @@ exact = _MatchKind("exact")
 lpm = _MatchKind("lpm")
 
 
+# --- bool ---
+
+
+class BoolType:
+    """P4's bool type."""
+
+    def __repr__(self) -> str:
+        return "bool"
+
+
+# Module-level singleton; users write p4.bool.
+# Named bool_ to avoid shadowing Python's built-in bool.
+bool_ = BoolType()
+
+
+# --- built-in actions ---
+
+
+class _BuiltinAction:
+    """A built-in P4 action (e.g., NoAction)."""
+
+    def __init__(self, name: str) -> None:
+        self._p4_name = name
+
+    def __repr__(self) -> str:
+        return self._p4_name
+
+
+NoAction = _BuiltinAction("NoAction")
+
+
 def literal(value: int, *, width: int) -> int:
     """Width-annotated integer literal. Emits as ``<width>w<value>`` in P4."""
     return value
