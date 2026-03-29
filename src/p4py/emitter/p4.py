@@ -125,6 +125,31 @@ def _emit_struct(lines: list[str], s: ir.StructType) -> None:
     lines.append("")
 
 
+def _emit_typedef(lines: list[str], td: ir.TypedefDecl) -> None:
+    lines.append(f"typedef bit<{td.type.width}> {td.name};")
+
+
+def _emit_newtype(lines: list[str], nt: ir.NewtypeDecl) -> None:
+    lines.append(f"type bit<{nt.type.width}> {nt.name};")
+
+
+def _emit_enum(lines: list[str], e: ir.EnumDecl) -> None:
+    lines.append(f"enum bit<{e.underlying_type.width}> {e.name} {{")
+    for i, member in enumerate(e.members):
+        comma = "," if i < len(e.members) - 1 else ""
+        lines.append(f"    {member.name} = {member.value}{comma}")
+    lines.append("};")
+    lines.append("")
+
+
+def _emit_const(lines: list[str], c: ir.ConstDecl) -> None:
+    if c.value > 255:
+        val = _emit_hex_literal(c.value)
+    else:
+        val = str(c.value)
+    lines.append(f"const {c.type_name} {c.name} = {val};")
+
+
 def _emit_parser_state(lines: list[str], state: ir.ParserState) -> None:
     lines.append(f"    state {state.name} {{")
     for stmt in state.body:
