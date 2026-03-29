@@ -16,7 +16,11 @@ py_test(
 )
 
 exports_files(
-    ["stf_sim_runner.py"],
+    [
+        "stf_sim_runner.py",
+        "golden_runner.py",
+        "p4testgen_runner.py",
+    ],
     visibility = [
         "//tests:__subpackages__",
     ],
@@ -25,6 +29,27 @@ exports_files(
 py_library(
     name = "stf_sim_runner",
     srcs = ["stf_sim_runner.py"],
+    visibility = [
+        "//tests:__subpackages__",
+    ],
+    deps = [
+        ":stf_runner",
+        "//src/p4py",
+    ],
+)
+
+py_library(
+    name = "golden_runner",
+    srcs = ["golden_runner.py"],
+    visibility = [
+        "//tests:__subpackages__",
+    ],
+    deps = ["//src/p4py"],
+)
+
+py_library(
+    name = "p4testgen_runner",
+    srcs = ["p4testgen_runner.py"],
     visibility = [
         "//tests:__subpackages__",
     ],

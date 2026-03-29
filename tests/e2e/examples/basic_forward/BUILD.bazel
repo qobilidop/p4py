@@ -1,4 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_library")
+load("//tests/infra:p4testgen_test.bzl", "p4testgen_test")
 load("//tests/infra:stf_test.bzl", "stf_test")
 
 py_library(
@@ -14,15 +15,8 @@ stf_test(
     stf_file = "basic_forward.stf",
 )
 
-py_test(
-    name = "basic_forward_testgen_test",
-    timeout = "moderate",
-    srcs = ["basic_forward_testgen_test.py"],
-    data = ["@p4c//backends/p4tools:p4testgen"],
-    tags = ["e2e"],
-    deps = [
-        ":basic_forward",
-        "//src/p4py",
-        "//tests/infra:stf_runner",
-    ],
+p4testgen_test(
+    name = "basic_forward_p4testgen_test",
+    p4_module = "tests.e2e.examples.basic_forward.basic_forward",
+    p4_library = ":basic_forward",
 )

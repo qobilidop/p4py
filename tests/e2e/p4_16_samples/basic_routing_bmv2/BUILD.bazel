@@ -1,4 +1,6 @@
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_library")
+load("//tests/infra:golden_test.bzl", "golden_test")
+load("//tests/infra:p4testgen_test.bzl", "p4testgen_test")
 load("//tests/infra:stf_test.bzl", "stf_test")
 
 py_library(
@@ -14,26 +16,15 @@ stf_test(
     stf_file = "basic_routing_bmv2.stf",
 )
 
-py_test(
+golden_test(
     name = "basic_routing_bmv2_golden_test",
-    srcs = ["basic_routing_bmv2_golden_test.py"],
-    data = ["basic_routing_bmv2.p4"],
-    tags = ["e2e"],
-    deps = [
-        ":basic_routing_bmv2",
-        "//src/p4py",
-    ],
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2.basic_routing_bmv2",
+    p4_library = ":basic_routing_bmv2",
+    golden_file = "basic_routing_bmv2.p4",
 )
 
-py_test(
-    name = "basic_routing_bmv2_testgen_test",
-    timeout = "moderate",
-    srcs = ["basic_routing_bmv2_testgen_test.py"],
-    data = ["@p4c//backends/p4tools:p4testgen"],
-    tags = ["e2e"],
-    deps = [
-        ":basic_routing_bmv2",
-        "//src/p4py",
-        "//tests/infra:stf_runner",
-    ],
+p4testgen_test(
+    name = "basic_routing_bmv2_p4testgen_test",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2.basic_routing_bmv2",
+    p4_library = ":basic_routing_bmv2",
 )
