@@ -43,19 +43,31 @@ class _SimState:
     headers: dict[str, _HeaderInstance]
     metadata: dict[str, int]
     std_meta: dict[str, int]
-    program: nodes.Program
+    program: nodes.Program | nodes.EbpfProgram
+    control_locals: dict[str, int] = field(default_factory=dict)
 
 
 def simulate(
-    program: nodes.Program,
+    program: nodes.Program | nodes.EbpfProgram,
     packet: bytes,
     ingress_port: int,
     table_entries: dict[str, list[dict]] | None = None,
 ) -> SimResult:
-    """Simulate a packet through a P4Mini program."""
+    """Simulate a packet through a P4 program."""
     if table_entries is None:
         table_entries = {}
+    if isinstance(program, nodes.EbpfProgram):
+        return _simulate_ebpf(program, packet, table_entries)
+    return _simulate_v1model(program, packet, ingress_port, table_entries)
 
+
+def _simulate_v1model(
+    program: nodes.Program,
+    packet: bytes,
+    ingress_port: int,
+    table_entries: dict[str, list[dict]],
+) -> SimResult:
+    """Simulate a packet through a v1model program."""
     # Initialize header instances and metadata fields from struct definitions.
     headers: dict[str, _HeaderInstance] = {}
     metadata: dict[str, int] = {}
@@ -108,6 +120,49 @@ def simulate(
         egress_port=state.std_meta["egress_spec"],
         dropped=False,
     )
+
+
+def _simulate_ebpf(
+    program: nodes.EbpfProgram,
+    packet: bytes,
+    table_entries: dict[str, list[dict]],
+) -> SimResult:
+    """Simulate a packet through an eBPF filter program."""
+    headers: dict[str, _HeaderInstance] = {}
+    header_types = {h.name: h for h in program.headers}
+    for s in program.structs:
+        for member in s.members:
+            if isinstance(member.type, str) and member.type in header_types:
+                headers[member.name] = _HeaderInstance(
+                    type_info=header_types[member.type]
+                )
+
+    state = _SimState(
+        packet_bytes=bytearray(packet),
+        cursor=0,
+        headers=headers,
+        metadata={},
+        std_meta={},
+        program=program,
+    )
+
+    terminal = _run_parser(state, program.parser)
+    if terminal == "reject":
+        return SimResult(packet=None, egress_port=-1, dropped=True)
+
+    # eBPF: if no headers were successfully extracted, drop.
+    any_valid = any(h.valid for h in state.headers.values())
+    if not any_valid:
+        return SimResult(packet=None, egress_port=-1, dropped=True)
+
+    # Run filter control with `accept` as a control-local.
+    state.control_locals["accept"] = 0  # default false
+    _run_control(state, program.filter, table_entries)
+
+    if state.control_locals.get("accept", 0):
+        return SimResult(packet=bytes(packet), egress_port=0, dropped=False)
+    else:
+        return SimResult(packet=None, egress_port=-1, dropped=True)
 
 
 def _run_parser(state: _SimState, parser: nodes.ParserDecl) -> str:
@@ -186,6 +241,9 @@ def _exec_control_statement(
                 break
     elif isinstance(stmt, nodes.FunctionCall):
         _exec_action_by_name(state, stmt.name, {}, ctx)
+    elif isinstance(stmt, nodes.Assignment):
+        value = _eval_expression(state, stmt.value, {})
+        _set_field(state, stmt.target, value)
     elif isinstance(stmt, nodes.ChecksumVerify):
         _exec_checksum_verify(state, stmt)
     elif isinstance(stmt, nodes.ChecksumUpdate):
@@ -227,10 +285,41 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
         _exec_action_by_name(state, action_name, best_match.get("args", {}), ctx)
         return action_name
 
+    # Check const_entries from IR.
+    for const_entry in table.const_entries:
+        const_values = tuple(
+            _eval_expression(state, v, {}) for v in const_entry.values
+        )
+        lookup_values = tuple(lookup_key.values())
+        if const_values == lookup_values:
+            action_args = _build_const_entry_args(
+                const_entry, ctx.actions.get(const_entry.action_name)
+            )
+            _exec_action_by_name(state, const_entry.action_name, action_args, ctx)
+            return const_entry.action_name
+
     # No match — execute default action (no-op if none specified).
     if table.default_action:
         _exec_action_by_name(state, table.default_action, {}, ctx)
     return table.default_action
+
+
+def _build_const_entry_args(
+    entry: nodes.ConstEntry,
+    action_decl: nodes.ActionDecl | None,
+) -> dict[str, int]:
+    """Build action args dict from a const entry's positional args."""
+    if action_decl is None or not entry.action_args:
+        return {}
+    args = {}
+    for param, arg_expr in zip(action_decl.params, entry.action_args):
+        if isinstance(arg_expr, nodes.BoolLiteral):
+            args[param.name] = int(arg_expr.value)
+        elif isinstance(arg_expr, nodes.IntLiteral):
+            args[param.name] = arg_expr.value
+        else:
+            raise ValueError(f"Unsupported const entry arg: {arg_expr}")
+    return args
 
 
 def _resolve_struct_field_width(
@@ -255,8 +344,8 @@ def _resolve_struct_field_width(
 def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:
     """Look up the bit width of a header or metadata field."""
     path = field.path
-    # hdr.header.field → look up from header type info
-    if path[0] == "hdr" and len(path) == 3:
+    # 3-element path: *.header.field — look up from header type info
+    if len(path) == 3 and path[1] in state.headers:
         header_inst = state.headers[path[1]]
         for hf in header_inst.type_info.fields:
             if hf.name == path[2]:
@@ -312,6 +401,8 @@ def _exec_action_by_name(
     ctx: _ControlContext,
 ) -> None:
     """Execute a named action with given arguments."""
+    if action_name in ("NoAction", "NoAction_0", "NoAction_1"):
+        return  # Built-in no-op.
     action = ctx.actions[action_name]
     # Build local bindings from action params.
     local_bindings: dict[str, int] = {}
@@ -482,9 +573,13 @@ def _eval_is_valid(state: _SimState, iv: nodes.IsValid) -> bool:
 def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int]) -> int:
     """Read a field value."""
     path = fa.path
-    # Local variable (action parameter).
+    # Local variable (action parameter) or control local.
     if len(path) == 1:
-        return locals_[path[0]]
+        if path[0] in locals_:
+            return locals_[path[0]]
+        if path[0] in state.control_locals:
+            return state.control_locals[path[0]]
+        raise ValueError(f"Unknown local variable: {path[0]}")
     # std_meta.field
     if path[0] == "std_meta":
         return state.std_meta[path[1]]
@@ -492,8 +587,8 @@ def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int])
     if path[0] == "meta":
         key = ".".join(path[1:])
         return state.metadata[key]
-    # hdr.header.field
-    if path[0] == "hdr" and len(path) == 3:
+    # 3-element path: struct.header.field (covers hdr.x.y and eBPF headers.x.y)
+    if len(path) == 3 and path[1] in state.headers:
         return state.headers[path[1]].fields.get(path[2], 0)
     raise ValueError(f"Cannot read field: {'.'.join(path)}")
 
@@ -501,12 +596,15 @@ def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int])
 def _set_field(state: _SimState, fa: nodes.FieldAccess, value: int) -> None:
     """Write a field value."""
     path = fa.path
+    if len(path) == 1:
+        state.control_locals[path[0]] = value
+        return
     if path[0] == "std_meta":
         state.std_meta[path[1]] = value
     elif path[0] == "meta":
         key = ".".join(path[1:])
         state.metadata[key] = value
-    elif path[0] == "hdr" and len(path) == 3:
+    elif len(path) == 3 and path[1] in state.headers:
         state.headers[path[1]].fields[path[2]] = value
     else:
         raise ValueError(f"Cannot write field: {'.'.join(path)}")
