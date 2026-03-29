@@ -54,6 +54,12 @@ class TypedefDecl:
     type: BitType
 
 
+@dataclass(frozen=True)
+class NewtypeDecl:
+    name: str
+    type: BitType
+
+
 # --- Expressions ---
 
 

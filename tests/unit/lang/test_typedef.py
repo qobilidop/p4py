@@ -31,5 +31,22 @@ class TestTypedef(absltest.TestCase):
         self.assertEqual(meta_t._p4_members[0], ("vrf", MyBit))
 
 
+class TestNewtype(absltest.TestCase):
+    def test_basic(self):
+        PortId_t = p4.newtype(p4.bit(9), "PortId_t")
+        self.assertEqual(PortId_t._p4_name, "PortId_t")
+        self.assertEqual(PortId_t._p4_underlying, p4.bit(9))
+        self.assertEqual(PortId_t._p4_kind, "newtype")
+        self.assertEqual(PortId_t.width, 9)
+
+    def test_struct_member_accepts_newtype(self):
+        PortId_t = p4.newtype(p4.bit(9), "PortId_t")
+
+        class meta_t(p4.struct):
+            port: PortId_t
+
+        self.assertEqual(meta_t._p4_members[0], ("port", PortId_t))
+
+
 if __name__ == "__main__":
     absltest.main()

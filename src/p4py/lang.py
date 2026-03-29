@@ -52,6 +52,11 @@ def typedef(underlying: BitType, name: str) -> _NamedType:
     return _NamedType(underlying, name, "typedef")
 
 
+def newtype(underlying: BitType, name: str) -> _NamedType:
+    """Create a P4 type: type bit<W> name."""
+    return _NamedType(underlying, name, "newtype")
+
+
 # --- header ---
 
 

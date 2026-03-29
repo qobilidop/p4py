@@ -19,5 +19,17 @@ class TestTypedefDecl(absltest.TestCase):
             decl.name = "other"
 
 
+class TestNewtypeDecl(absltest.TestCase):
+    def test_creation(self):
+        decl = ir.NewtypeDecl(name="PortId_t", type=ir.BitType(9))
+        self.assertEqual(decl.name, "PortId_t")
+        self.assertEqual(decl.type, ir.BitType(9))
+
+    def test_frozen(self):
+        decl = ir.NewtypeDecl(name="PortId_t", type=ir.BitType(9))
+        with self.assertRaises(FrozenInstanceError):
+            decl.name = "other"
+
+
 if __name__ == "__main__":
     absltest.main()
