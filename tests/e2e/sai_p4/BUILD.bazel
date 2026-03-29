@@ -15,11 +15,8 @@ golden_test(
     p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
 )
 
-# TODO: Enable once clone() simulation is implemented. P4Testgen generates
-# 3 test cases that all exercise clone (copy/trap actions), which our sim
-# stubs as no-op. The emitted P4 compiles and P4Testgen runs successfully.
-# p4testgen_test(
-#     name = "wbb_p4testgen_test",
-#     p4_library = ":wbb",
-#     p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
-# )
+p4testgen_test(
+    name = "wbb_p4testgen_test",
+    p4_library = ":wbb",
+    p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
+)

@@ -111,7 +111,11 @@ def run_p4testgen_test(module_path: str, p4testgen_path: str) -> bool:
                     packet=pkt.data,
                     ingress_port=pkt.port,
                     table_entries=sim_inputs.table_entries,
+                    clone_session_map=sim_inputs.clone_session_map,
                 )
+                # Clone outputs appear before the original in STF expects.
+                for clone_port, clone_pkt in result.clone_outputs:
+                    sim_results.append((clone_port, clone_pkt.hex()))
                 if result.dropped:
                     sim_results.append((-1, None))
                 else:

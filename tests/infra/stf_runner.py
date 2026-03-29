@@ -73,6 +73,11 @@ class SimInputs:
     table_entries: dict[str, list[dict]]
     packets: list[SimPacket]
     expects: list[SimExpect]
+    clone_session_map: dict[int, int] | None = None
+
+    def __post_init__(self):
+        if self.clone_session_map is None:
+            self.clone_session_map = {}
 
 
 def stf_to_sim_inputs(stf_text: str) -> SimInputs:
@@ -86,10 +91,16 @@ def stf_to_sim_inputs(stf_text: str) -> SimInputs:
     table_entries: dict[str, list[dict]] = {}
     packets: list[SimPacket] = []
     expects: list[SimExpect] = []
+    clone_session_map: dict[int, int] = {}
 
     for cmd, args in commands:
         if cmd == "add":
             _parse_stf_add_to_sim(args, table_entries)
+        elif cmd == "mirroring_add":
+            parts = args.split()
+            session_id = int(parts[0])
+            port = int(parts[1])
+            clone_session_map[session_id] = port
         elif cmd == "packet":
             parts = args.split(None, 1)
             port = int(parts[0])
@@ -105,7 +116,10 @@ def stf_to_sim_inputs(stf_text: str) -> SimInputs:
             )
             expects.append(SimExpect(port=port, pattern=pattern))
 
-    return SimInputs(table_entries=table_entries, packets=packets, expects=expects)
+    return SimInputs(
+        table_entries=table_entries, packets=packets, expects=expects,
+        clone_session_map=clone_session_map,
+    )
 
 
 def _strip_control_prefix(name: str) -> str:
@@ -155,6 +169,8 @@ def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> No
     prefix_len_dict: dict[str, int] = {}
     mask_dict: dict[str, int] = {}
     for field, value in key_pairs:
+        # Normalize $valid$ to isValid() to match simulator's internal naming.
+        field = field.replace(".$valid$", ".isValid()")
         if "/" in value:
             val_str, plen_str = value.rsplit("/", 1)
             key_dict[field] = int(val_str.replace("*", "0"), 0)
