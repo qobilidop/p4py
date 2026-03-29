@@ -5,6 +5,7 @@ py_library(
     srcs = ["stf_runner.py"],
     visibility = [
         "//examples:__subpackages__",
+        "//examples:__subpackages__",
         "//tests:__subpackages__",
     ],
 )
@@ -22,6 +23,7 @@ exports_files(
         "p4testgen_runner.py",
     ],
     visibility = [
+        "//examples:__subpackages__",
         "//tests:__subpackages__",
     ],
 )
@@ -30,6 +32,7 @@ py_library(
     name = "stf_sim_runner",
     srcs = ["stf_sim_runner.py"],
     visibility = [
+        "//examples:__subpackages__",
         "//tests:__subpackages__",
     ],
     deps = [
@@ -42,6 +45,7 @@ py_library(
     name = "golden_runner",
     srcs = ["golden_runner.py"],
     visibility = [
+        "//examples:__subpackages__",
         "//tests:__subpackages__",
     ],
     deps = ["//src/p4py"],
@@ -51,6 +55,7 @@ py_library(
     name = "p4testgen_runner",
     srcs = ["p4testgen_runner.py"],
     visibility = [
+        "//examples:__subpackages__",
         "//tests:__subpackages__",
     ],
     deps = [

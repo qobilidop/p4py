@@ -1,4 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_library")
+load("//tests/infra:golden_test.bzl", "golden_test")
 
 py_library(
     name = "basic_forward",
@@ -6,12 +7,9 @@ py_library(
     deps = ["//src/p4py"],
 )
 
-py_test(
+golden_test(
     name = "basic_forward_golden_test",
-    srcs = ["basic_forward_golden_test.py"],
-    data = ["basic_forward.p4"],
-    deps = [
-        ":basic_forward",
-        "//src/p4py",
-    ],
+    p4_module = "examples.basic_forward.basic_forward",
+    p4_library = ":basic_forward",
+    golden_file = "basic_forward.p4",
 )
