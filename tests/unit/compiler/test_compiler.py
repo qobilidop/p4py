@@ -9,6 +9,14 @@ from p4py.compiler import compile
 from p4py.ir import nodes
 
 
+def _get_block(package, name):
+    """Get a block declaration from a Package by name."""
+    for entry in package.blocks:
+        if entry.name == name:
+            return entry.decl
+    return None
+
+
 # Shared type fixtures.
 class ethernet_t(p4.header):
     dstAddr: p4.bit(48)
@@ -78,9 +86,9 @@ class TestCompileParser(absltest.TestCase):
             ingress=_dummy_ingress(),
             deparser=_dummy_deparser(),
         )
-        program = compile(pipeline)
+        package = compile(pipeline)
 
-        parser_ir = program.parser
+        parser_ir = _get_block(package, "parser")
         self.assertEqual(parser_ir.name, "MyParser")
         self.assertLen(parser_ir.states, 1)
 
@@ -112,9 +120,9 @@ class TestCompileParser(absltest.TestCase):
             ingress=_dummy_ingress(),
             deparser=_dummy_deparser(),
         )
-        program = compile(pipeline)
+        package = compile(pipeline)
 
-        parser_ir = program.parser
+        parser_ir = _get_block(package, "parser")
         self.assertLen(parser_ir.states, 2)
 
         start = parser_ir.states[0]
@@ -166,9 +174,9 @@ class TestCompileControl(absltest.TestCase):
             ingress=MyIngress,
             deparser=_dummy_deparser(),
         )
-        program = compile(pipeline)
+        package = compile(pipeline)
 
-        ingress = program.ingress
+        ingress = _get_block(package, "ingress")
         self.assertEqual(ingress.name, "MyIngress")
 
         # Actions
@@ -225,9 +233,10 @@ class TestCompileControl(absltest.TestCase):
             ingress=MyIngress,
             deparser=_dummy_deparser(),
         )
-        program = compile(pipeline)
+        package = compile(pipeline)
 
-        drop_action = program.ingress.actions[0]
+        ingress = _get_block(package, "ingress")
+        drop_action = ingress.actions[0]
         self.assertIsInstance(drop_action.body[0], nodes.FunctionCall)
         self.assertEqual(drop_action.body[0].name, "mark_to_drop")
 
@@ -244,9 +253,9 @@ class TestCompileDeparser(absltest.TestCase):
             ingress=_dummy_ingress(),
             deparser=MyDeparser,
         )
-        program = compile(pipeline)
+        package = compile(pipeline)
 
-        dep = program.deparser
+        dep = _get_block(package, "deparser")
         self.assertEqual(dep.name, "MyDeparser")
         self.assertLen(dep.emit_order, 2)
         self.assertEqual(dep.emit_order[0], nodes.FieldAccess(path=("hdr", "ethernet")))
@@ -273,24 +282,24 @@ class TestCompileProgram(absltest.TestCase):
             ingress=I,
             deparser=D,
         )
-        program = compile(pipeline)
+        package = compile(pipeline)
 
         # Headers extracted from struct
-        self.assertLen(program.headers, 2)
-        self.assertEqual(program.headers[0].name, "ethernet_t")
-        self.assertEqual(program.headers[1].name, "ipv4_t")
-        self.assertLen(program.headers[0].fields, 3)
+        self.assertLen(package.headers, 2)
+        self.assertEqual(package.headers[0].name, "ethernet_t")
+        self.assertEqual(package.headers[1].name, "ipv4_t")
+        self.assertLen(package.headers[0].fields, 3)
         self.assertEqual(
-            program.headers[0].fields[0],
+            package.headers[0].fields[0],
             nodes.HeaderField("dstAddr", nodes.BitType(48)),
         )
 
         # Structs
-        self.assertLen(program.structs, 2)
-        self.assertEqual(program.structs[0].name, "headers_t")
-        self.assertEqual(program.structs[1].name, "metadata_t")
+        self.assertLen(package.structs, 2)
+        self.assertEqual(package.structs[0].name, "headers_t")
+        self.assertEqual(package.structs[1].name, "metadata_t")
         self.assertEqual(
-            program.structs[0].members[0], nodes.StructMember("ethernet", "ethernet_t")
+            package.structs[0].members[0], nodes.StructMember("ethernet", "ethernet_t")
         )
 
     def test_nested_struct_compiled(self):
@@ -315,10 +324,10 @@ class TestCompileProgram(absltest.TestCase):
             pass
 
         pipeline = V1Switch(parser=P, ingress=I, deparser=D)
-        program = compile(pipeline)
+        package = compile(pipeline)
 
         # Inner struct should appear before outer struct.
-        struct_names = [s.name for s in program.structs]
+        struct_names = [s.name for s in package.structs]
         self.assertIn("ingress_metadata_t", struct_names)
         self.assertIn("nested_meta_t", struct_names)
         self.assertLess(
@@ -327,7 +336,7 @@ class TestCompileProgram(absltest.TestCase):
         )
 
         # Outer struct should reference inner by name.
-        outer = next(s for s in program.structs if s.name == "nested_meta_t")
+        outer = next(s for s in package.structs if s.name == "nested_meta_t")
         self.assertLen(outer.members, 1)
         self.assertEqual(
             outer.members[0],
@@ -335,7 +344,7 @@ class TestCompileProgram(absltest.TestCase):
         )
 
         # Inner struct should have bit fields.
-        inner = next(s for s in program.structs if s.name == "ingress_metadata_t")
+        inner = next(s for s in package.structs if s.name == "ingress_metadata_t")
         self.assertLen(inner.members, 2)
         self.assertEqual(inner.members[0], nodes.StructMember("vrf", nodes.BitType(12)))
 
@@ -378,23 +387,25 @@ class TestCompileEbpf(absltest.TestCase):
             tbl.apply()
 
         pipeline = ebpf_model.ebpfFilter(parser=prs, filter=pipe)
-        program = compile(pipeline)
+        package = compile(pipeline)
 
-        self.assertIsInstance(program, nodes.EbpfProgram)
-        self.assertEqual(program.parser.name, "prs")
-        self.assertEqual(program.filter.name, "pipe")
-        self.assertEqual(len(program.headers), 1)
-        self.assertEqual(program.headers[0].name, "Ethernet")
+        self.assertIsInstance(package, nodes.Package)
+        parser_ir = _get_block(package, "parser")
+        filter_ir = _get_block(package, "filter")
+        self.assertEqual(parser_ir.name, "prs")
+        self.assertEqual(filter_ir.name, "pipe")
+        self.assertEqual(len(package.headers), 1)
+        self.assertEqual(package.headers[0].name, "Ethernet")
 
         # Check table has const_entries and implementation.
-        self.assertEqual(len(program.filter.tables), 1)
-        tbl = program.filter.tables[0]
+        self.assertEqual(len(filter_ir.tables), 1)
+        tbl = filter_ir.tables[0]
         self.assertEqual(tbl.name, "tbl")
         self.assertEqual(len(tbl.const_entries), 2)
         self.assertEqual(tbl.implementation, "hash_table(64)")
 
         # Check bool param on action.
-        match_action = program.filter.actions[0]
+        match_action = filter_ir.actions[0]
         self.assertEqual(match_action.name, "match")
         self.assertIsInstance(match_action.params[0].type, nodes.BoolType)
 

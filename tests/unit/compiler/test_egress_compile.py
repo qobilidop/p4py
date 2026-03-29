@@ -7,6 +7,14 @@ from p4py.arch import v1model
 from p4py.compiler import compile
 
 
+def _get_block(package, name):
+    """Get a block declaration from a Package by name."""
+    for entry in package.blocks:
+        if entry.name == name:
+            return entry.decl
+    return None
+
+
 class ethernet_t(p4.header):
     dstAddr: p4.bit(48)
     srcAddr: p4.bit(48)
@@ -76,22 +84,23 @@ class TestEgressCompile(absltest.TestCase):
             egress=TestEgress,
             deparser=TestDeparser,
         )
-        program = compile(main)
-        self.assertIsNotNone(program.egress)
-        self.assertEqual(program.egress.name, "TestEgress")
-        self.assertLen(program.egress.actions, 2)
-        self.assertLen(program.egress.tables, 1)
-        self.assertEqual(program.egress.tables[0].name, "rewrite_table")
+        package = compile(main)
+        egress = _get_block(package, "egress")
+        self.assertIsNotNone(egress)
+        self.assertEqual(egress.name, "TestEgress")
+        self.assertLen(egress.actions, 2)
+        self.assertLen(egress.tables, 1)
+        self.assertEqual(egress.tables[0].name, "rewrite_table")
 
     def test_no_egress_produces_none(self):
-        """Pipeline without egress produces IR with egress=None."""
+        """Pipeline without egress produces no egress block."""
         main = v1model.V1Switch(
             parser=TestParser,
             ingress=TestIngress,
             deparser=TestDeparser,
         )
-        program = compile(main)
-        self.assertIsNone(program.egress)
+        package = compile(main)
+        self.assertIsNone(_get_block(package, "egress"))
 
 
 if __name__ == "__main__":

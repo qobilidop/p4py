@@ -8,6 +8,14 @@ from p4py.compiler import compile
 from p4py.ir import nodes
 
 
+def _get_block(package, name):
+    """Get a block declaration from a Package by name."""
+    for entry in package.blocks:
+        if entry.name == name:
+            return entry.decl
+    return None
+
+
 class ethernet_t(p4.header):
     dstAddr: p4.bit(48)
     srcAddr: p4.bit(48)
@@ -111,7 +119,7 @@ def TestDeparser(pkt, hdr):
 
 class TestChecksumCompile(absltest.TestCase):
     def test_verify_checksum_compiled(self):
-        """verify_checksum control produces ChecksumVerify IR node."""
+        """verify_checksum control produces FunctionCall IR node."""
         main = v1model.V1Switch(
             parser=TestParser,
             verify_checksum=TestVerifyChecksum,
@@ -119,24 +127,34 @@ class TestChecksumCompile(absltest.TestCase):
             compute_checksum=TestComputeChecksum,
             deparser=TestDeparser,
         )
-        program = compile(main)
-        self.assertIsNotNone(program.verify_checksum)
-        self.assertEqual(program.verify_checksum.name, "TestVerifyChecksum")
-        self.assertLen(program.verify_checksum.apply_body, 1)
-        stmt = program.verify_checksum.apply_body[0]
-        self.assertIsInstance(stmt, nodes.ChecksumVerify)
-        self.assertIsInstance(stmt.condition, nodes.IsValid)
-        self.assertLen(stmt.data, 11)
+        package = compile(main)
+        verify = _get_block(package, "verify_checksum")
+        self.assertIsNotNone(verify)
+        self.assertEqual(verify.name, "TestVerifyChecksum")
+        self.assertLen(verify.apply_body, 1)
+        stmt = verify.apply_body[0]
+        self.assertIsInstance(stmt, nodes.FunctionCall)
+        self.assertEqual(stmt.name, "verify_checksum")
+        # 4 keyword args: condition, data, checksum, algo
+        self.assertLen(stmt.args, 4)
+        # condition is IsValid
+        self.assertIsInstance(stmt.args[0], nodes.IsValid)
+        # data is a ListExpression with 11 fields
+        self.assertIsInstance(stmt.args[1], nodes.ListExpression)
+        self.assertLen(stmt.args[1].elements, 11)
         self.assertEqual(
-            stmt.data[0], nodes.FieldAccess(path=("hdr", "ipv4", "version"))
+            stmt.args[1].elements[0],
+            nodes.FieldAccess(path=("hdr", "ipv4", "version")),
         )
+        # checksum is a FieldAccess
         self.assertEqual(
-            stmt.checksum, nodes.FieldAccess(path=("hdr", "ipv4", "hdrChecksum"))
+            stmt.args[2], nodes.FieldAccess(path=("hdr", "ipv4", "hdrChecksum"))
         )
-        self.assertEqual(stmt.algo, "csum16")
+        # algo is a FieldAccess (v1model.HashAlgorithm.csum16 → module stripped)
+        self.assertIsInstance(stmt.args[3], nodes.FieldAccess)
 
     def test_compute_checksum_compiled(self):
-        """update_checksum control produces ChecksumUpdate IR node."""
+        """update_checksum control produces FunctionCall IR node."""
         main = v1model.V1Switch(
             parser=TestParser,
             verify_checksum=TestVerifyChecksum,
@@ -144,22 +162,25 @@ class TestChecksumCompile(absltest.TestCase):
             compute_checksum=TestComputeChecksum,
             deparser=TestDeparser,
         )
-        program = compile(main)
-        self.assertIsNotNone(program.compute_checksum)
-        stmt = program.compute_checksum.apply_body[0]
-        self.assertIsInstance(stmt, nodes.ChecksumUpdate)
-        self.assertEqual(stmt.algo, "csum16")
+        package = compile(main)
+        compute = _get_block(package, "compute_checksum")
+        self.assertIsNotNone(compute)
+        stmt = compute.apply_body[0]
+        self.assertIsInstance(stmt, nodes.FunctionCall)
+        self.assertEqual(stmt.name, "update_checksum")
+        self.assertLen(stmt.args, 4)
+        self.assertIsInstance(stmt.args[1], nodes.ListExpression)
 
     def test_no_checksum_produces_none(self):
-        """Pipeline without checksum controls produces None."""
+        """Pipeline without checksum controls produces no checksum blocks."""
         main = v1model.V1Switch(
             parser=TestParser,
             ingress=TestIngress,
             deparser=TestDeparser,
         )
-        program = compile(main)
-        self.assertIsNone(program.verify_checksum)
-        self.assertIsNone(program.compute_checksum)
+        package = compile(main)
+        self.assertIsNone(_get_block(package, "verify_checksum"))
+        self.assertIsNone(_get_block(package, "compute_checksum"))
 
 
 if __name__ == "__main__":

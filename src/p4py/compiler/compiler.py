@@ -1,67 +1,38 @@
 """Compiles P4Mini language specs into IR nodes.
 
-Parses Python AST from captured function sources and produces IR Program.
+Parses Python AST from captured function sources and produces IR Package.
 """
 
 from __future__ import annotations
 
 import ast
 
-from p4py.arch.ebpf_model import ebpfFilter
-from p4py.arch.v1model import V1Switch
 from p4py.ir import nodes
 
 
-def compile(pipeline) -> nodes.Program | nodes.EbpfProgram:
-    """Compile a pipeline into an IR Program."""
-    if isinstance(pipeline, V1Switch):
-        return _compile_v1switch(pipeline)
-    if isinstance(pipeline, ebpfFilter):
-        return _compile_ebpf(pipeline)
-    raise TypeError(f"Unsupported pipeline type: {type(pipeline)}")
-
-
-def _compile_v1switch(pipeline: V1Switch) -> nodes.Program:
-    """Compile a V1Switch pipeline into an IR Program."""
+def compile(pipeline) -> nodes.Package:
+    """Compile a pipeline into a Package."""
+    arch = pipeline.arch
     headers_ir = _compile_types(pipeline.headers)
-    structs_ir = _compile_structs(pipeline.headers, pipeline.metadata)
-    parser_ir = _compile_parser(pipeline.parser)
-    ingress_ir = _compile_control(pipeline.ingress)
-    egress_ir = _compile_control(pipeline.egress) if pipeline.egress else None
-    verify_ir = (
-        _compile_checksum_control(pipeline.verify_checksum)
-        if pipeline.verify_checksum
-        else None
-    )
-    compute_ir = (
-        _compile_checksum_control(pipeline.compute_checksum)
-        if pipeline.compute_checksum
-        else None
-    )
-    deparser_ir = _compile_deparser(pipeline.deparser)
-    return nodes.Program(
-        headers=headers_ir,
-        structs=structs_ir,
-        parser=parser_ir,
-        ingress=ingress_ir,
-        deparser=deparser_ir,
-        egress=egress_ir,
-        verify_checksum=verify_ir,
-        compute_checksum=compute_ir,
-    )
+    structs_ir = _compile_structs(pipeline)
 
+    blocks = []
+    for spec in arch.pipeline:
+        block_src = getattr(pipeline, spec.name, None)
+        if block_src is None:
+            continue
+        if spec.kind == "parser":
+            decl = _compile_parser(block_src)
+        elif spec.kind == "control":
+            decl = _compile_control(block_src)
+        elif spec.kind == "deparser":
+            decl = _compile_deparser(block_src)
+        else:
+            raise ValueError(f"Unknown block kind: {spec.kind}")
+        blocks.append(nodes.BlockEntry(name=spec.name, kind=spec.kind, decl=decl))
 
-def _compile_ebpf(pipeline: ebpfFilter) -> nodes.EbpfProgram:
-    """Compile an ebpfFilter pipeline into an EbpfProgram."""
-    headers_ir = _compile_types(pipeline.headers)
-    structs_ir = _compile_structs_no_metadata(pipeline.headers)
-    parser_ir = _compile_parser(pipeline.parser)
-    filter_ir = _compile_control(pipeline.filter)
-    return nodes.EbpfProgram(
-        headers=headers_ir,
-        structs=structs_ir,
-        parser=parser_ir,
-        filter=filter_ir,
+    return nodes.Package(
+        arch=arch, headers=headers_ir, structs=structs_ir, blocks=tuple(blocks),
     )
 
 
@@ -77,9 +48,7 @@ def _compile_types(headers_struct: type) -> tuple[nodes.HeaderType, ...]:
     return tuple(result)
 
 
-def _compile_structs(
-    headers_struct: type, metadata_struct: type
-) -> tuple[nodes.StructType, ...]:
+def _compile_structs(pipeline) -> tuple[nodes.StructType, ...]:
     """Compile struct types to IR."""
     from p4py.lang._types import struct as p4_struct
 
@@ -102,22 +71,10 @@ def _compile_structs(
         result.append(nodes.StructType(name=s._p4_name, members=tuple(members)))
         seen.add(s._p4_name)
 
-    for s in (headers_struct, metadata_struct):
-        _compile_one(s)
+    _compile_one(pipeline.headers)
+    if hasattr(pipeline, "metadata") and pipeline.metadata is not None:
+        _compile_one(pipeline.metadata)
     return tuple(result)
-
-
-def _compile_structs_no_metadata(
-    headers_struct: type,
-) -> tuple[nodes.StructType, ...]:
-    """Compile struct types to IR (no metadata struct)."""
-    members = []
-    for name, ann in headers_struct._p4_members:
-        if hasattr(ann, "width"):
-            members.append(nodes.StructMember(name, nodes.BitType(ann.width)))
-        else:
-            members.append(nodes.StructMember(name, ann._p4_name))
-    return (nodes.StructType(name=headers_struct._p4_name, members=tuple(members)),)
 
 
 def _parse_spec_ast(spec) -> ast.FunctionDef:
@@ -192,6 +149,10 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
     ):
         header_ref = _ast_to_field_access(node.func.value)
         return nodes.IsValid(header_ref=header_ref)
+    if isinstance(node, ast.List):
+        return nodes.ListExpression(
+            elements=tuple(_ast_to_expression(elt) for elt in node.elts)
+        )
     raise ValueError(f"Unsupported expression: {ast.dump(node)}")
 
 
@@ -264,7 +225,10 @@ def _ast_call_to_statement(call: ast.Call, params: set[str]) -> nodes.Statement:
         # block parameter (e.g. v1model.mark_to_drop).  Strip the module
         # prefix and emit a plain FunctionCall.
         if isinstance(attr.value, ast.Name) and attr.value.id not in params:
-            args = tuple(_ast_to_expression(a) for a in call.args)
+            if call.keywords:
+                args = tuple(_ast_to_expression(kw.value) for kw in call.keywords)
+            else:
+                args = tuple(_ast_to_expression(a) for a in call.args)
             return nodes.FunctionCall(name=attr.attr, args=args)
         obj = _ast_to_field_access(attr.value)
         args = tuple(_ast_to_expression(a) for a in call.args)
@@ -559,75 +523,6 @@ def _compile_implementation(node: ast.expr) -> str:
             return f"{name}({node.args[0].value})"
         return name
     raise ValueError(f"Unsupported implementation: {ast.dump(node)}")
-
-
-# --- Checksum control compilation ---
-
-
-def _compile_checksum_control(spec) -> nodes.ControlDecl:
-    """Compile a checksum control (verify_checksum or compute_checksum)."""
-    func_def = _parse_spec_ast(spec)
-    params = _param_names(func_def)
-    apply_body: list[nodes.Statement] = []
-
-    for node in func_def.body:
-        if isinstance(node, ast.Pass):
-            continue
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-            stmt = _compile_checksum_call(node.value)
-            if stmt is not None:
-                apply_body.append(stmt)
-                continue
-        apply_body.append(_ast_to_statement(node, params))
-
-    return nodes.ControlDecl(
-        name=spec._p4_name,
-        actions=(),
-        tables=(),
-        apply_body=tuple(apply_body),
-    )
-
-
-def _compile_checksum_call(
-    call: ast.Call,
-) -> nodes.ChecksumVerify | nodes.ChecksumUpdate | None:
-    """Try to compile a function call as a checksum extern."""
-    if not isinstance(call.func, ast.Attribute):
-        return None
-    func_name = call.func.attr
-    if func_name not in ("verify_checksum", "update_checksum"):
-        return None
-
-    # Parse keyword arguments.
-    kwargs: dict[str, ast.expr] = {}
-    for kw in call.keywords:
-        kwargs[kw.arg] = kw.value
-
-    condition = _ast_to_expression(kwargs["condition"])
-    checksum = _ast_to_field_access(kwargs["checksum"])
-
-    # data is a list of field accesses.
-    data_node = kwargs["data"]
-    if isinstance(data_node, ast.List):
-        data = tuple(_ast_to_field_access(elt) for elt in data_node.elts)
-    else:
-        raise ValueError(f"Checksum data must be a list literal: {ast.dump(data_node)}")
-
-    # algo is v1model.HashAlgorithm.csum16 → extract the final attribute name.
-    algo_node = kwargs["algo"]
-    if isinstance(algo_node, ast.Attribute):
-        algo = algo_node.attr
-    else:
-        raise ValueError(f"Unsupported algo: {ast.dump(algo_node)}")
-
-    if func_name == "verify_checksum":
-        return nodes.ChecksumVerify(
-            condition=condition, data=data, checksum=checksum, algo=algo
-        )
-    else:
-        return nodes.ChecksumUpdate(
-            condition=condition, data=data, checksum=checksum, algo=algo
-        )
 
 
 # --- Deparser compilation ---
