@@ -387,6 +387,53 @@ class TestCompileCast(absltest.TestCase):
         self.assertEqual(assign.value.type_name, "port_id_t")
 
 
+class _Consts:
+    """Namespace for constants used in match/case (Python requires dotted names)."""
+
+    ETHERTYPE_IPV4 = p4.const(
+        p4.typedef(p4.bit(16), "bit16_t"), 0x0800, "ETHERTYPE_IPV4"
+    )
+
+
+class TestCompileConstRef(absltest.TestCase):
+    def test_compile_const_ref_in_select(self):
+        """Named constants in select cases compile to ConstRef."""
+
+        class h_t(p4.header):
+            f: p4.bit(16)
+
+        class _headers_t(p4.struct):
+            h: h_t
+
+        class _meta_t(p4.struct):
+            pass
+
+        @p4.parser
+        def MyParser(pkt, hdr: _headers_t, meta: _meta_t, std_meta):
+            def start():
+                pkt.extract(hdr.h)
+                match hdr.h.f:
+                    case _Consts.ETHERTYPE_IPV4:
+                        return p4.ACCEPT
+                    case _:
+                        return p4.REJECT
+
+        main = V1Switch(
+            parser=MyParser,
+            verify_checksum=None,
+            ingress=None,
+            egress=None,
+            compute_checksum=None,
+            deparser=None,
+        )
+        pkg = compile(main)
+        parser_decl = pkg.blocks[0].decl
+        ts = parser_decl.states[0].transition
+        self.assertIsInstance(ts, nodes.TransitionSelect)
+        self.assertIsInstance(ts.cases[0].value, nodes.ConstRef)
+        self.assertEqual(ts.cases[0].value.name, "ETHERTYPE_IPV4")
+
+
 class TestCompileEbpf(absltest.TestCase):
     def test_compile_init_ebpf(self):
         """Compile a minimal eBPF program to IR."""

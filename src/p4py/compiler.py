@@ -491,10 +491,14 @@ def _compile_transition_select(match: ast.Match) -> ir.TransitionSelect:
         # Default case: case _
         if isinstance(case.pattern, ast.MatchAs) and case.pattern.name is None:
             value = None
-        # Value case: case 0x0800
+        # Value case: case 0x0800 or case Ns.CONST_NAME
         elif isinstance(case.pattern, ast.MatchValue):
             if isinstance(case.pattern.value, ast.Constant):
                 value = case.pattern.value.value
+            elif isinstance(case.pattern.value, ast.Name):
+                value = ir.ConstRef(name=case.pattern.value.id)
+            elif isinstance(case.pattern.value, ast.Attribute):
+                value = ir.ConstRef(name=case.pattern.value.attr)
             else:
                 raise ValueError(f"Unsupported match value: {ast.dump(case.pattern)}")
         else:
