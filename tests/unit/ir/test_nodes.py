@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError
 
 from absl.testing import absltest
 
-from p4py.ir import nodes
+from p4py import ir as nodes
 
 
 class TestTypes(absltest.TestCase):

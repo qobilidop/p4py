@@ -7,10 +7,10 @@ are delegated to the architecture descriptor on the Package.
 
 from __future__ import annotations
 
-from p4py.ir import nodes
+from p4py import ir
 
 
-def emit(package: nodes.Package) -> str:
+def emit(package: ir.Package) -> str:
     """Emit a P4-16 source string from a Package."""
     arch = package.arch
     lines: list[str] = []
@@ -50,7 +50,7 @@ def emit(package: nodes.Package) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _derive_struct_names(package: nodes.Package) -> dict[str, str]:
+def _derive_struct_names(package: ir.Package) -> dict[str, str]:
     """Derive struct name mapping from the package."""
     names: dict[str, str] = {"headers": package.structs[0].name}
     if len(package.structs) > 1:
@@ -67,7 +67,7 @@ def _boilerplate_name(block_name: str) -> str:
 # --- Generic block emitters ---
 
 
-def _emit_parser_block(lines: list[str], p: nodes.ParserDecl, sig: str) -> None:
+def _emit_parser_block(lines: list[str], p: ir.ParserDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", p.name)
     lines.append(sig_line + " {")
     for state in p.states:
@@ -76,7 +76,7 @@ def _emit_parser_block(lines: list[str], p: nodes.ParserDecl, sig: str) -> None:
     lines.append("")
 
 
-def _emit_control_block(lines: list[str], c: nodes.ControlDecl, sig: str) -> None:
+def _emit_control_block(lines: list[str], c: ir.ControlDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", c.name)
     lines.append(sig_line + " {")
     for action in c.actions:
@@ -91,7 +91,7 @@ def _emit_control_block(lines: list[str], c: nodes.ControlDecl, sig: str) -> Non
     lines.append("")
 
 
-def _emit_deparser_block(lines: list[str], d: nodes.DeparserDecl, sig: str) -> None:
+def _emit_deparser_block(lines: list[str], d: ir.DeparserDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", d.name)
     lines.append(sig_line + " {")
     lines.append("    apply {")
@@ -105,7 +105,7 @@ def _emit_deparser_block(lines: list[str], d: nodes.DeparserDecl, sig: str) -> N
 # --- Shared emitters ---
 
 
-def _emit_header(lines: list[str], h: nodes.HeaderType) -> None:
+def _emit_header(lines: list[str], h: ir.HeaderType) -> None:
     lines.append(f"header {h.name} {{")
     for field in h.fields:
         lines.append(f"    bit<{field.type.width}> {field.name};")
@@ -113,10 +113,10 @@ def _emit_header(lines: list[str], h: nodes.HeaderType) -> None:
     lines.append("")
 
 
-def _emit_struct(lines: list[str], s: nodes.StructType) -> None:
+def _emit_struct(lines: list[str], s: ir.StructType) -> None:
     lines.append(f"struct {s.name} {{")
     for member in s.members:
-        if isinstance(member.type, nodes.BitType):
+        if isinstance(member.type, ir.BitType):
             lines.append(f"    bit<{member.type.width}> {member.name};")
         else:
             lines.append(f"    {member.type} {member.name};")
@@ -124,13 +124,13 @@ def _emit_struct(lines: list[str], s: nodes.StructType) -> None:
     lines.append("")
 
 
-def _emit_parser_state(lines: list[str], state: nodes.ParserState) -> None:
+def _emit_parser_state(lines: list[str], state: ir.ParserState) -> None:
     lines.append(f"    state {state.name} {{")
     for stmt in state.body:
         lines.append(f"        {_emit_statement(stmt)}")
-    if isinstance(state.transition, nodes.Transition):
+    if isinstance(state.transition, ir.Transition):
         lines.append(f"        transition {state.transition.next_state};")
-    elif isinstance(state.transition, nodes.TransitionSelect):
+    elif isinstance(state.transition, ir.TransitionSelect):
         ts = state.transition
         lines.append(f"        transition select({_emit_field_access(ts.field)}) {{")
         for case in ts.cases:
@@ -144,10 +144,10 @@ def _emit_parser_state(lines: list[str], state: nodes.ParserState) -> None:
     lines.append("    }")
 
 
-def _emit_action(lines: list[str], a: nodes.ActionDecl) -> None:
+def _emit_action(lines: list[str], a: ir.ActionDecl) -> None:
     param_strs = []
     for p in a.params:
-        if isinstance(p.type, nodes.BoolType):
+        if isinstance(p.type, ir.BoolType):
             param_strs.append(f"bool {p.name}")
         else:
             param_strs.append(f"bit<{p.type.width}> {p.name}")
@@ -159,7 +159,7 @@ def _emit_action(lines: list[str], a: nodes.ActionDecl) -> None:
     lines.append("")
 
 
-def _emit_table(lines: list[str], t: nodes.TableDecl) -> None:
+def _emit_table(lines: list[str], t: ir.TableDecl) -> None:
     lines.append(f"    table {t.name} {{")
     lines.append("        key = {")
     for key in t.keys:
@@ -190,10 +190,10 @@ def _emit_table(lines: list[str], t: nodes.TableDecl) -> None:
     lines.append("")
 
 
-def _emit_block_statement(lines: list[str], stmt: nodes.Statement, indent: int) -> None:
+def _emit_block_statement(lines: list[str], stmt: ir.Statement, indent: int) -> None:
     """Emit a statement that may contain nested blocks (if/else)."""
     pad = " " * indent
-    if isinstance(stmt, nodes.IfElse):
+    if isinstance(stmt, ir.IfElse):
         cond = _emit_expression(stmt.condition)
         lines.append(f"{pad}if ({cond}) {{")
         for s in stmt.then_body:
@@ -203,7 +203,7 @@ def _emit_block_statement(lines: list[str], stmt: nodes.Statement, indent: int) 
             for s in stmt.else_body:
                 _emit_block_statement(lines, s, indent + 4)
         lines.append(f"{pad}}}")
-    elif isinstance(stmt, nodes.SwitchAction):
+    elif isinstance(stmt, ir.SwitchAction):
         lines.append(f"{pad}switch ({stmt.table_name}.apply().action_run) {{")
         for case in stmt.cases:
             lines.append(f"{pad}    {case.action_name}: {{")
@@ -220,27 +220,27 @@ def _emit_block_statement(lines: list[str], stmt: nodes.Statement, indent: int) 
             lines.append(f"{pad}{text}")
 
 
-def _emit_statement(stmt: nodes.Statement) -> str:
+def _emit_statement(stmt: ir.Statement) -> str:
     """Emit a single-line statement."""
-    if isinstance(stmt, nodes.Assignment):
+    if isinstance(stmt, ir.Assignment):
         return f"{_emit_field_access(stmt.target)} = {_emit_expression(stmt.value)};"
-    if isinstance(stmt, nodes.MethodCall):
+    if isinstance(stmt, ir.MethodCall):
         args = ", ".join(_emit_expression(a) for a in stmt.args)
         return f"{_emit_field_access(stmt.object)}.{stmt.method}({args});"
-    if isinstance(stmt, nodes.FunctionCall):
-        if any(isinstance(a, nodes.ListExpression) for a in stmt.args):
+    if isinstance(stmt, ir.FunctionCall):
+        if any(isinstance(a, ir.ListExpression) for a in stmt.args):
             return _emit_multiline_function_call(stmt)
         args = ", ".join(_emit_expression(a) for a in stmt.args)
         return f"{stmt.name}({args});"
-    if isinstance(stmt, nodes.ActionCall):
+    if isinstance(stmt, ir.ActionCall):
         args = ", ".join(_emit_expression(a) for a in stmt.args)
         return f"{stmt.name}({args});"
-    if isinstance(stmt, nodes.TableApply):
+    if isinstance(stmt, ir.TableApply):
         return f"{stmt.table_name}.apply();"
     raise ValueError(f"Cannot emit statement: {stmt}")
 
 
-def _emit_multiline_function_call(stmt: nodes.FunctionCall) -> str:
+def _emit_multiline_function_call(stmt: ir.FunctionCall) -> str:
     """Emit a function call with one arg per line (for checksum-style calls)."""
     parts = [f"{stmt.name}("]
     for i, arg in enumerate(stmt.args):
@@ -249,29 +249,29 @@ def _emit_multiline_function_call(stmt: nodes.FunctionCall) -> str:
     return "\n".join(parts)
 
 
-def _emit_expression(expr: nodes.Expression) -> str:
+def _emit_expression(expr: ir.Expression) -> str:
     """Emit an expression."""
-    if isinstance(expr, nodes.FieldAccess):
+    if isinstance(expr, ir.FieldAccess):
         return _emit_field_access(expr)
-    if isinstance(expr, nodes.BoolLiteral):
+    if isinstance(expr, ir.BoolLiteral):
         return "true" if expr.value else "false"
-    if isinstance(expr, nodes.IntLiteral):
+    if isinstance(expr, ir.IntLiteral):
         if expr.width is not None:
             return f"{expr.width}w{expr.value}"
         if expr.hex:
             return _emit_hex_literal(expr.value)
         return str(expr.value)
-    if isinstance(expr, nodes.ArithOp):
+    if isinstance(expr, ir.ArithOp):
         return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
-    if isinstance(expr, nodes.IsValid):
+    if isinstance(expr, ir.IsValid):
         return f"{_emit_field_access(expr.header_ref)}.isValid()"
-    if isinstance(expr, nodes.ListExpression):
+    if isinstance(expr, ir.ListExpression):
         inner = ", ".join(_emit_expression(e) for e in expr.elements)
         return "{ " + inner + " }"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 
-def _emit_field_access(fa: nodes.FieldAccess) -> str:
+def _emit_field_access(fa: ir.FieldAccess) -> str:
     """Emit a dotted field path."""
     return ".".join(fa.path)
 

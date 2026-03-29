@@ -15,8 +15,8 @@ import sys
 import tempfile
 
 from p4py.arch.ebpf_model import EbpfFilterArch
-from p4py.backend.p4 import emit
 from p4py.compiler import compile
+from p4py.emitter.p4 import emit
 from p4py.sim import simulate
 from tests.infra.stf_runner import match_hex, stf_to_sim_inputs
 

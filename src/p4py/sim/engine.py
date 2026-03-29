@@ -8,14 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from p4py.ir import nodes
+from p4py import ir
 
 
 @dataclass
 class _HeaderInstance:
     """Runtime state of a parsed header."""
 
-    type_info: nodes.HeaderType
+    type_info: ir.HeaderType
     valid: bool = False
     fields: dict[str, int] = field(default_factory=dict)
 
@@ -34,7 +34,7 @@ class _SimState:
 
 
 def init_state(
-    package: nodes.Package,
+    package: ir.Package,
 ) -> tuple[dict[str, _HeaderInstance], dict[str, int], dict[str, int]]:
     """Initialize headers, metadata, and metadata_widths from a Package."""
     headers: dict[str, _HeaderInstance] = {}
@@ -44,7 +44,7 @@ def init_state(
     struct_types = {s.name: s for s in package.structs}
     for s in package.structs:
         for member in s.members:
-            if isinstance(member.type, nodes.BitType):
+            if isinstance(member.type, ir.BitType):
                 metadata[member.name] = 0
                 metadata_widths[member.name] = member.type.width
             elif isinstance(member.type, str) and member.type in header_types:
@@ -54,7 +54,7 @@ def init_state(
             elif isinstance(member.type, str) and member.type in struct_types:
                 inner = struct_types[member.type]
                 for inner_member in inner.members:
-                    if isinstance(inner_member.type, nodes.BitType):
+                    if isinstance(inner_member.type, ir.BitType):
                         key = f"{member.name}.{inner_member.name}"
                         metadata[key] = 0
                         metadata_widths[key] = inner_member.type.width
@@ -66,7 +66,7 @@ class SimEngine:
 
     def __init__(
         self,
-        package: nodes.Package,
+        package: ir.Package,
         packet: bytes,
         table_entries: dict[str, list[dict]],
     ) -> None:
@@ -86,27 +86,27 @@ class SimEngine:
         """Register an extern function handler."""
         self._externs[name] = handler
 
-    def run_parser(self, parser_decl: nodes.ParserDecl) -> str:
+    def run_parser(self, parser_decl: ir.ParserDecl) -> str:
         """Execute the parser state machine. Returns terminal state."""
         return _run_parser(self.state, parser_decl, self._externs)
 
-    def run_control(self, control_decl: nodes.ControlDecl) -> None:
+    def run_control(self, control_decl: ir.ControlDecl) -> None:
         """Execute a control block."""
         _run_control(self.state, control_decl, self._table_entries, self._externs)
 
-    def run_deparser(self, deparser_decl: nodes.DeparserDecl) -> bytes:
+    def run_deparser(self, deparser_decl: ir.DeparserDecl) -> bytes:
         """Deparse headers back to bytes."""
         return bytes(_run_deparser(self.state, deparser_decl))
 
-    def eval_expression(self, expr: nodes.Expression) -> int:
+    def eval_expression(self, expr: ir.Expression) -> int:
         """Evaluate an expression to an integer value."""
         return _eval_expression(self.state, expr, {})
 
-    def resolve_field_width(self, field_access: nodes.FieldAccess) -> int:
+    def resolve_field_width(self, field_access: ir.FieldAccess) -> int:
         """Look up the bit width of a field."""
         return _resolve_field_width(self.state, field_access)
 
-    def set_field(self, field_access: nodes.FieldAccess, value: int) -> None:
+    def set_field(self, field_access: ir.FieldAccess, value: int) -> None:
         """Write a field value."""
         _set_field(self.state, field_access, value)
 
@@ -118,7 +118,7 @@ class SimEngine:
 
 def _run_parser(
     state: _SimState,
-    parser: nodes.ParserDecl,
+    parser: ir.ParserDecl,
     externs: dict[str, object],
 ) -> str:
     """Execute the parser state machine. Returns terminal state."""
@@ -131,16 +131,16 @@ def _run_parser(
             _exec_statement(state, stmt, {}, externs)
 
         transition = parser_state.transition
-        if isinstance(transition, nodes.Transition):
+        if isinstance(transition, ir.Transition):
             current = transition.next_state
-        elif isinstance(transition, nodes.TransitionSelect):
+        elif isinstance(transition, ir.TransitionSelect):
             field_val = _eval_expression(state, transition.field, {})
             current = _match_select(transition.cases, field_val)
 
     return current
 
 
-def _match_select(cases: tuple[nodes.SelectCase, ...], value: int) -> str:
+def _match_select(cases: tuple[ir.SelectCase, ...], value: int) -> str:
     """Find the matching case in a transition select."""
     default = None
     for case in cases:
@@ -155,7 +155,7 @@ def _match_select(cases: tuple[nodes.SelectCase, ...], value: int) -> str:
 
 def _run_control(
     state: _SimState,
-    control: nodes.ControlDecl,
+    control: ir.ControlDecl,
     table_entries: dict[str, list[dict]],
     externs: dict[str, object],
 ) -> None:
@@ -175,38 +175,38 @@ def _run_control(
 
 @dataclass
 class _ControlContext:
-    actions: dict[str, nodes.ActionDecl]
-    tables: dict[str, nodes.TableDecl]
+    actions: dict[str, ir.ActionDecl]
+    tables: dict[str, ir.TableDecl]
     entries: dict[str, list[dict]]
     externs: dict[str, object]
 
 
 def _exec_control_statement(
-    state: _SimState, stmt: nodes.Statement, ctx: _ControlContext
+    state: _SimState, stmt: ir.Statement, ctx: _ControlContext
 ) -> None:
     """Execute a statement in a control apply block."""
-    if isinstance(stmt, nodes.TableApply):
+    if isinstance(stmt, ir.TableApply):
         _exec_table_apply(state, stmt.table_name, ctx)
-    elif isinstance(stmt, nodes.IfElse):
+    elif isinstance(stmt, ir.IfElse):
         if _eval_is_valid(state, stmt.condition):
             for s in stmt.then_body:
                 _exec_control_statement(state, s, ctx)
         else:
             for s in stmt.else_body:
                 _exec_control_statement(state, s, ctx)
-    elif isinstance(stmt, nodes.SwitchAction):
+    elif isinstance(stmt, ir.SwitchAction):
         action_run = _exec_table_apply(state, stmt.table_name, ctx)
         for case in stmt.cases:
             if case.action_name == action_run:
                 for s in case.body:
                     _exec_control_statement(state, s, ctx)
                 break
-    elif isinstance(stmt, nodes.FunctionCall):
+    elif isinstance(stmt, ir.FunctionCall):
         if stmt.name in ctx.externs:
             ctx.externs[stmt.name](stmt)
         else:
             _exec_action_by_name(state, stmt.name, {}, ctx)
-    elif isinstance(stmt, nodes.Assignment):
+    elif isinstance(stmt, ir.Assignment):
         value = _eval_expression(state, stmt.value, {})
         _set_field(state, stmt.target, value)
     else:
@@ -259,17 +259,17 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
 
 
 def _build_const_entry_args(
-    entry: nodes.ConstEntry,
-    action_decl: nodes.ActionDecl | None,
+    entry: ir.ConstEntry,
+    action_decl: ir.ActionDecl | None,
 ) -> dict[str, int]:
     """Build action args dict from a const entry's positional args."""
     if action_decl is None or not entry.action_args:
         return {}
     args = {}
     for param, arg_expr in zip(action_decl.params, entry.action_args, strict=False):
-        if isinstance(arg_expr, nodes.BoolLiteral):
+        if isinstance(arg_expr, ir.BoolLiteral):
             args[param.name] = int(arg_expr.value)
-        elif isinstance(arg_expr, nodes.IntLiteral):
+        elif isinstance(arg_expr, ir.IntLiteral):
             args[param.name] = arg_expr.value
         else:
             raise ValueError(f"Unsupported const entry arg: {arg_expr}")
@@ -277,14 +277,14 @@ def _build_const_entry_args(
 
 
 def _resolve_struct_field_width(
-    s: nodes.StructType,
+    s: ir.StructType,
     remaining: list[str],
-    struct_types: dict[str, nodes.StructType],
+    struct_types: dict[str, ir.StructType],
 ) -> int | None:
     """Walk a struct chain to resolve a field's bit width."""
     for member in s.members:
         if member.name == remaining[0]:
-            if len(remaining) == 1 and isinstance(member.type, nodes.BitType):
+            if len(remaining) == 1 and isinstance(member.type, ir.BitType):
                 return member.type.width
             if len(remaining) > 1 and isinstance(member.type, str):
                 inner = struct_types.get(member.type)
@@ -295,7 +295,7 @@ def _resolve_struct_field_width(
     return None
 
 
-def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:
+def _resolve_field_width(state: _SimState, field: ir.FieldAccess) -> int:
     """Look up the bit width of a header or metadata field."""
     path = field.path
     # 3-element path: *.header.field
@@ -363,31 +363,31 @@ def _exec_action_by_name(
 
 def _exec_statement(
     state: _SimState,
-    stmt: nodes.Statement,
+    stmt: ir.Statement,
     locals_: dict[str, int],
     externs: dict[str, object],
 ) -> None:
     """Execute a single statement."""
-    if isinstance(stmt, nodes.MethodCall):
+    if isinstance(stmt, ir.MethodCall):
         if stmt.method == "extract":
             _exec_extract(state, stmt.args[0])
         else:
             raise ValueError(f"Unknown method: {stmt.method}")
-    elif isinstance(stmt, nodes.FunctionCall):
+    elif isinstance(stmt, ir.FunctionCall):
         if stmt.name in externs:
             externs[stmt.name](stmt)
         else:
             raise ValueError(f"Unknown function: {stmt.name}")
-    elif isinstance(stmt, nodes.Assignment):
+    elif isinstance(stmt, ir.Assignment):
         value = _eval_expression(state, stmt.value, locals_)
         _set_field(state, stmt.target, value)
     else:
         raise ValueError(f"Unsupported statement in action: {stmt}")
 
 
-def _exec_extract(state: _SimState, header_ref: nodes.Expression) -> None:
+def _exec_extract(state: _SimState, header_ref: ir.Expression) -> None:
     """Extract a header from the packet byte buffer."""
-    if not isinstance(header_ref, nodes.FieldAccess):
+    if not isinstance(header_ref, ir.FieldAccess):
         raise ValueError(f"Expected FieldAccess, got {header_ref}")
     header_name = header_ref.path[-1]
     hdr = state.headers[header_name]
@@ -464,16 +464,16 @@ def compute_csum16(field_values: list[tuple[int, int]]) -> int:
 
 
 def _eval_expression(
-    state: _SimState, expr: nodes.Expression, locals_: dict[str, int]
+    state: _SimState, expr: ir.Expression, locals_: dict[str, int]
 ) -> int:
     """Evaluate an expression to an integer value."""
-    if isinstance(expr, nodes.BoolLiteral):
+    if isinstance(expr, ir.BoolLiteral):
         return int(expr.value)
-    if isinstance(expr, nodes.IntLiteral):
+    if isinstance(expr, ir.IntLiteral):
         return expr.value
-    if isinstance(expr, nodes.FieldAccess):
+    if isinstance(expr, ir.FieldAccess):
         return _get_field(state, expr, locals_)
-    if isinstance(expr, nodes.ArithOp):
+    if isinstance(expr, ir.ArithOp):
         left = _eval_expression(state, expr.left, locals_)
         right = _eval_expression(state, expr.right, locals_)
         if expr.op == "+":
@@ -481,18 +481,18 @@ def _eval_expression(
         if expr.op == "-":
             return left - right
         raise ValueError(f"Unknown op: {expr.op}")
-    if isinstance(expr, nodes.IsValid):
+    if isinstance(expr, ir.IsValid):
         return int(_eval_is_valid(state, expr))
     raise ValueError(f"Cannot evaluate: {expr}")
 
 
-def _eval_is_valid(state: _SimState, iv: nodes.IsValid) -> bool:
+def _eval_is_valid(state: _SimState, iv: ir.IsValid) -> bool:
     """Check if a header is valid."""
     header_name = iv.header_ref.path[-1]
     return state.headers[header_name].valid
 
 
-def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int]) -> int:
+def _get_field(state: _SimState, fa: ir.FieldAccess, locals_: dict[str, int]) -> int:
     """Read a field value."""
     path = fa.path
     if len(path) == 1:
@@ -514,7 +514,7 @@ def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int])
     raise ValueError(f"Cannot read field: {'.'.join(path)}")
 
 
-def _set_field(state: _SimState, fa: nodes.FieldAccess, value: int) -> None:
+def _set_field(state: _SimState, fa: ir.FieldAccess, value: int) -> None:
     """Write a field value."""
     path = fa.path
     if len(path) == 1:
@@ -531,7 +531,7 @@ def _set_field(state: _SimState, fa: nodes.FieldAccess, value: int) -> None:
         raise ValueError(f"Cannot write field: {'.'.join(path)}")
 
 
-def _run_deparser(state: _SimState, deparser: nodes.DeparserDecl) -> bytearray:
+def _run_deparser(state: _SimState, deparser: ir.DeparserDecl) -> bytearray:
     """Deparse headers back to bytes, followed by remaining payload."""
     output = bytearray()
     bit_offset = 0

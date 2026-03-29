@@ -4,8 +4,8 @@ from absl.testing import absltest
 
 import p4py.lang as p4
 from p4py.arch import v1model
-from p4py.backend.p4 import emit
 from p4py.compiler import compile
+from p4py.emitter.p4 import emit
 
 
 class ethernet_t(p4.header):

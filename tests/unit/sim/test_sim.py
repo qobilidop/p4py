@@ -1,4 +1,4 @@
-"""Tests for the P4Mini simulator."""
+"""Tests for the P4Py simulator."""
 
 from absl.testing import absltest
 
@@ -585,7 +585,7 @@ class TestSimulator(absltest.TestCase):
 class TestParserRejectDetection(absltest.TestCase):
     def test_run_parser_returns_accept(self):
         """_run_parser returns 'accept' for a valid packet."""
-        from p4py.ir import nodes
+        from p4py import ir as nodes
         from p4py.sim.engine import (
             _HeaderInstance,
             _run_parser,
@@ -632,7 +632,7 @@ class TestParserRejectDetection(absltest.TestCase):
 
         Header stays invalid when packet is too short.
         """
-        from p4py.ir import nodes
+        from p4py import ir as nodes
         from p4py.sim.engine import _HeaderInstance, _run_parser, _SimState
 
         eth_type = nodes.HeaderType(

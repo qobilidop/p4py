@@ -1,7 +1,7 @@
 """P4 IR node types.
 
 All nodes are frozen dataclasses. They form the canonical representation of a
-P4Mini program that backends and the simulator operate on.
+P4Py program that emitters and the simulator operate on.
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ class TableApply:
 
 @dataclass(frozen=True)
 class IfElse:
-    condition: IsValid  # P4Mini restricts conditions to IsValid only (hdr.x.isValid())
+    condition: IsValid  # Conditions restricted to IsValid only (hdr.x.isValid())
     then_body: tuple[Statement, ...]
     else_body: tuple[Statement, ...]
 

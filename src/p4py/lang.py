@@ -1,7 +1,12 @@
-"""P4 type definitions: bit, header, struct, and core built-ins."""
+"""P4Py language surface.
+
+Idiomatic usage: import p4py.lang as p4
+"""
 
 from __future__ import annotations
 
+import inspect
+import textwrap
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -121,6 +126,7 @@ class BoolType:
 # Module-level singleton; users write p4.bool.
 # Named bool_ to avoid shadowing Python's built-in bool.
 bool_ = BoolType()
+bool = bool_
 
 
 # --- built-in actions ---
@@ -151,3 +157,70 @@ def hex(value: int) -> int:
 
 ACCEPT = "accept"
 REJECT = "reject"
+
+
+# --- Block definitions: parser, control, deparser, and DSL sentinels ---
+
+
+class _Spec:
+    """A captured P4 block (parser, control, or deparser)."""
+
+    def __init__(self, kind: str, name: str, source: str, annotations: dict) -> None:
+        self._p4_kind = kind
+        self._p4_name = name
+        self._p4_source = source
+        self._p4_annotations = annotations
+
+
+def _make_decorator(kind: str):
+    def decorator(func):
+        source = textwrap.dedent(inspect.getsource(func))
+        annotations = {k: v for k, v in func.__annotations__.items() if k != "return"}
+        return _Spec(
+            kind=kind, name=func.__name__, source=source, annotations=annotations
+        )
+
+    return decorator
+
+
+parser = _make_decorator("parser")
+control = _make_decorator("control")
+deparser = _make_decorator("deparser")
+
+
+class _Sentinel:
+    """A sentinel object recognized by the AST parser."""
+
+    def __init__(self, kind: str, name: str) -> None:
+        self._p4_kind = kind
+        self._p4_name = name
+
+    def __repr__(self) -> str:
+        return self._p4_name
+
+
+action = _Sentinel("decorator", "action")
+table = _Sentinel("builtin", "table")
+
+
+__all__ = [
+    "ACCEPT",
+    "REJECT",
+    "BitType",
+    "BoolType",
+    "NoAction",
+    "_Spec",
+    "action",
+    "bit",
+    "bool",
+    "control",
+    "deparser",
+    "exact",
+    "header",
+    "hex",
+    "literal",
+    "lpm",
+    "parser",
+    "struct",
+    "table",
+]

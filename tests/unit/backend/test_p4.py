@@ -6,8 +6,8 @@ import p4py.lang as p4
 from p4py.arch import ebpf_model
 from p4py.arch.ebpf_model import ebpfFilter
 from p4py.arch.v1model import V1Switch, mark_to_drop
-from p4py.backend.p4 import emit
 from p4py.compiler import compile
+from p4py.emitter.p4 import emit
 
 
 class ethernet_t(p4.header):

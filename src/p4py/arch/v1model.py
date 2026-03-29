@@ -1,4 +1,4 @@
-"""v1model architecture for P4Mini.
+"""v1model architecture for P4Py.
 
 Defines the minimal v1model subset: standard_metadata_t, mark_to_drop,
 and V1Switch pipeline.
@@ -138,7 +138,7 @@ class V1ModelArch(Architecture):
             lines.append("")
 
     def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
-        from p4py.sim.simulator import SimResult
+        from p4py.sim import SimResult
 
         eng = engine_cls(package, packet, table_entries)
 

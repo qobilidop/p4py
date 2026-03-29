@@ -11,8 +11,8 @@ from __future__ import annotations
 import importlib
 import sys
 
-from p4py.backend.p4 import emit
 from p4py.compiler import compile
+from p4py.emitter.p4 import emit
 
 
 def run_golden_test(module_path: str, golden_path: str) -> bool:

@@ -1,4 +1,4 @@
-"""Compiles P4Mini language specs into IR nodes.
+"""Compiles P4Py language specs into IR nodes.
 
 Parses Python AST from captured function sources and produces IR Package.
 """
@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import ast
 
-from p4py.ir import nodes
+from p4py import ir
 
 
-def compile(pipeline) -> nodes.Package:
+def compile(pipeline) -> ir.Package:
     """Compile a pipeline into a Package."""
     arch = pipeline.arch
     headers_ir = _compile_types(pipeline.headers)
@@ -29,9 +29,9 @@ def compile(pipeline) -> nodes.Package:
             decl = _compile_deparser(block_src)
         else:
             raise ValueError(f"Unknown block kind: {spec.kind}")
-        blocks.append(nodes.BlockEntry(name=spec.name, kind=spec.kind, decl=decl))
+        blocks.append(ir.BlockEntry(name=spec.name, kind=spec.kind, decl=decl))
 
-    return nodes.Package(
+    return ir.Package(
         arch=arch,
         headers=headers_ir,
         structs=structs_ir,
@@ -39,21 +39,21 @@ def compile(pipeline) -> nodes.Package:
     )
 
 
-def _compile_types(headers_struct: type) -> tuple[nodes.HeaderType, ...]:
+def _compile_types(headers_struct: type) -> tuple[ir.HeaderType, ...]:
     """Extract HeaderType IR nodes from a headers struct class."""
     result = []
     for _, header_cls in headers_struct._p4_members:
         fields = tuple(
-            nodes.HeaderField(name, nodes.BitType(bt.width))
+            ir.HeaderField(name, ir.BitType(bt.width))
             for name, bt in header_cls._p4_fields
         )
-        result.append(nodes.HeaderType(name=header_cls._p4_name, fields=fields))
+        result.append(ir.HeaderType(name=header_cls._p4_name, fields=fields))
     return tuple(result)
 
 
-def _compile_structs(pipeline) -> tuple[nodes.StructType, ...]:
+def _compile_structs(pipeline) -> tuple[ir.StructType, ...]:
     """Compile struct types to IR."""
-    from p4py.lang._types import struct as p4_struct
+    from p4py.lang import struct as p4_struct
 
     result = []
     seen: set[str] = set()
@@ -68,10 +68,10 @@ def _compile_structs(pipeline) -> tuple[nodes.StructType, ...]:
         members = []
         for name, ann in s._p4_members:
             if hasattr(ann, "width"):
-                members.append(nodes.StructMember(name, nodes.BitType(ann.width)))
+                members.append(ir.StructMember(name, ir.BitType(ann.width)))
             else:
-                members.append(nodes.StructMember(name, ann._p4_name))
-        result.append(nodes.StructType(name=s._p4_name, members=tuple(members)))
+                members.append(ir.StructMember(name, ann._p4_name))
+        result.append(ir.StructType(name=s._p4_name, members=tuple(members)))
         seen.add(s._p4_name)
 
     _compile_one(pipeline.headers)
@@ -90,7 +90,7 @@ def _parse_spec_ast(spec) -> ast.FunctionDef:
     raise ValueError(f"Could not find function '{spec._p4_name}' in source")
 
 
-def _ast_to_field_access(node: ast.expr) -> nodes.FieldAccess:
+def _ast_to_field_access(node: ast.expr) -> ir.FieldAccess:
     """Convert an AST attribute chain to a FieldAccess IR node."""
     parts: list[str] = []
     current = node
@@ -101,15 +101,15 @@ def _ast_to_field_access(node: ast.expr) -> nodes.FieldAccess:
         parts.append(current.id)
     else:
         raise ValueError(f"Unexpected AST node in field access: {ast.dump(current)}")
-    return nodes.FieldAccess(path=tuple(reversed(parts)))
+    return ir.FieldAccess(path=tuple(reversed(parts)))
 
 
-def _ast_to_expression(node: ast.expr) -> nodes.Expression:
+def _ast_to_expression(node: ast.expr) -> ir.Expression:
     """Convert an AST expression to an IR Expression."""
     if isinstance(node, ast.Constant) and isinstance(node.value, bool):
-        return nodes.BoolLiteral(value=node.value)
+        return ir.BoolLiteral(value=node.value)
     if isinstance(node, ast.Constant) and isinstance(node.value, int):
-        return nodes.IntLiteral(value=node.value)
+        return ir.IntLiteral(value=node.value)
     # p4.literal(value, width=N) → IntLiteral with width
     if (
         isinstance(node, ast.Call)
@@ -122,7 +122,7 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
         for kw in node.keywords:
             if kw.arg == "width":
                 width = kw.value.value
-        return nodes.IntLiteral(value=value, width=width)
+        return ir.IntLiteral(value=value, width=width)
     # p4.hex(value) → IntLiteral with hex=True
     if (
         isinstance(node, ast.Call)
@@ -130,7 +130,7 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
         and node.func.attr == "hex"
         and len(node.args) == 1
     ):
-        return nodes.IntLiteral(value=node.args[0].value, hex=True)
+        return ir.IntLiteral(value=node.args[0].value, hex=True)
     if isinstance(node, (ast.Attribute, ast.Name)):
         return _ast_to_field_access(node)
     if isinstance(node, ast.BinOp):
@@ -140,7 +140,7 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
             op = "-"
         else:
             raise ValueError(f"Unsupported arithmetic operator: {ast.dump(node.op)}")
-        return nodes.ArithOp(
+        return ir.ArithOp(
             op=op,
             left=_ast_to_expression(node.left),
             right=_ast_to_expression(node.right),
@@ -151,21 +151,21 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
         and node.func.attr == "isValid"
     ):
         header_ref = _ast_to_field_access(node.func.value)
-        return nodes.IsValid(header_ref=header_ref)
+        return ir.IsValid(header_ref=header_ref)
     if isinstance(node, ast.List):
-        return nodes.ListExpression(
+        return ir.ListExpression(
             elements=tuple(_ast_to_expression(elt) for elt in node.elts)
         )
     raise ValueError(f"Unsupported expression: {ast.dump(node)}")
 
 
-def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
+def _ast_to_statement(node: ast.stmt, params: set[str]) -> ir.Statement:
     """Convert an AST statement to an IR Statement."""
     # Assignment: target = value
     if isinstance(node, ast.Assign) and len(node.targets) == 1:
         target = _ast_to_field_access(node.targets[0])
         value = _ast_to_expression(node.value)
-        return nodes.Assignment(target=target, value=value)
+        return ir.Assignment(target=target, value=value)
 
     # Expression statement (method call, function call, etc.)
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
@@ -174,7 +174,7 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
     # If/else
     if isinstance(node, ast.If):
         condition = _ast_to_expression(node.test)
-        if not isinstance(condition, nodes.IsValid):
+        if not isinstance(condition, ir.IsValid):
             raise ValueError("if conditions must be hdr.x.isValid()")
         then_body = tuple(
             s for n in node.body if (s := _ast_to_statement(n, params)) is not None
@@ -182,9 +182,7 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
         else_body = tuple(
             s for n in node.orelse if (s := _ast_to_statement(n, params)) is not None
         )
-        return nodes.IfElse(
-            condition=condition, then_body=then_body, else_body=else_body
-        )
+        return ir.IfElse(condition=condition, then_body=then_body, else_body=else_body)
 
     # match table.apply(): case "action": ... → SwitchAction
     if isinstance(node, ast.Match):
@@ -205,9 +203,9 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
                         if (s := _ast_to_statement(n, params)) is not None
                     )
                     cases.append(
-                        nodes.SwitchActionCase(action_name=action_name, body=body)
+                        ir.SwitchActionCase(action_name=action_name, body=body)
                     )
-            return nodes.SwitchAction(table_name=table_name, cases=tuple(cases))
+            return ir.SwitchAction(table_name=table_name, cases=tuple(cases))
 
     # pass → empty body (e.g., no-op actions)
     if isinstance(node, ast.Pass):
@@ -216,14 +214,14 @@ def _ast_to_statement(node: ast.stmt, params: set[str]) -> nodes.Statement:
     raise ValueError(f"Unsupported statement: {ast.dump(node)}")
 
 
-def _ast_call_to_statement(call: ast.Call, params: set[str]) -> nodes.Statement:
+def _ast_call_to_statement(call: ast.Call, params: set[str]) -> ir.Statement:
     """Convert an AST Call to a Statement (MethodCall, FunctionCall, etc.)."""
     # obj.method(args) — e.g., pkt.extract(hdr.ethernet)
     if isinstance(call.func, ast.Attribute):
         attr = call.func
         # table.apply()
         if attr.attr == "apply" and isinstance(attr.value, ast.Name):
-            return nodes.TableApply(table_name=attr.value.id)
+            return ir.TableApply(table_name=attr.value.id)
         # Module-qualified function: name.func(args) where name is not a
         # block parameter (e.g. v1model.mark_to_drop).  Strip the module
         # prefix and emit a plain FunctionCall.
@@ -233,24 +231,21 @@ def _ast_call_to_statement(call: ast.Call, params: set[str]) -> nodes.Statement:
                 args = []
                 for kw in call.keywords:
                     expr = _ast_to_expression(kw.value)
-                    if (
-                        isinstance(expr, nodes.FieldAccess)
-                        and expr.path[0] == module_name
-                    ):
-                        expr = nodes.FieldAccess(path=expr.path[1:])
+                    if isinstance(expr, ir.FieldAccess) and expr.path[0] == module_name:
+                        expr = ir.FieldAccess(path=expr.path[1:])
                     args.append(expr)
                 args = tuple(args)
             else:
                 args = tuple(_ast_to_expression(a) for a in call.args)
-            return nodes.FunctionCall(name=attr.attr, args=args)
+            return ir.FunctionCall(name=attr.attr, args=args)
         obj = _ast_to_field_access(attr.value)
         args = tuple(_ast_to_expression(a) for a in call.args)
-        return nodes.MethodCall(object=obj, method=attr.attr, args=args)
+        return ir.MethodCall(object=obj, method=attr.attr, args=args)
 
     # free_function(args) — e.g., mark_to_drop(std_meta), drop()
     if isinstance(call.func, ast.Name):
         args = tuple(_ast_to_expression(a) for a in call.args)
-        return nodes.FunctionCall(name=call.func.id, args=args)
+        return ir.FunctionCall(name=call.func.id, args=args)
 
     raise ValueError(f"Unsupported call: {ast.dump(call)}")
 
@@ -263,7 +258,7 @@ def _param_names(func_def: ast.FunctionDef) -> set[str]:
     return {arg.arg for arg in func_def.args.args}
 
 
-def _compile_parser(spec) -> nodes.ParserDecl:
+def _compile_parser(spec) -> ir.ParserDecl:
     """Compile a @p4.parser spec into a ParserDecl."""
     func_def = _parse_spec_ast(spec)
     params = _param_names(func_def)
@@ -271,15 +266,15 @@ def _compile_parser(spec) -> nodes.ParserDecl:
     for node in func_def.body:
         if isinstance(node, ast.FunctionDef):
             states.append(_compile_parser_state(node, params))
-    return nodes.ParserDecl(name=spec._p4_name, states=tuple(states))
+    return ir.ParserDecl(name=spec._p4_name, states=tuple(states))
 
 
 def _compile_parser_state(
     func_def: ast.FunctionDef, params: set[str]
-) -> nodes.ParserState:
+) -> ir.ParserState:
     """Compile a nested function into a ParserState."""
-    body_stmts: list[nodes.Statement] = []
-    transition: nodes.Transition | nodes.TransitionSelect | None = None
+    body_stmts: list[ir.Statement] = []
+    transition: ir.Transition | ir.TransitionSelect | None = None
 
     for node in func_def.body:
         # return <state> — unconditional transition
@@ -296,26 +291,26 @@ def _compile_parser_state(
         raise ValueError(
             f"Parser state '{func_def.name}' has no transition (return or match)"
         )
-    return nodes.ParserState(
+    return ir.ParserState(
         name=func_def.name,
         body=tuple(body_stmts),
         transition=transition,
     )
 
 
-def _compile_transition(ret: ast.Return) -> nodes.Transition:
+def _compile_transition(ret: ast.Return) -> ir.Transition:
     """Compile a return statement to a Transition."""
     if isinstance(ret.value, ast.Name):
-        return nodes.Transition(next_state=ret.value.id)
+        return ir.Transition(next_state=ret.value.id)
     if isinstance(ret.value, ast.Attribute):
         # p4.ACCEPT, p4.REJECT
-        return nodes.Transition(next_state=ret.value.attr.lower())
+        return ir.Transition(next_state=ret.value.attr.lower())
     if isinstance(ret.value, ast.Constant) and isinstance(ret.value.value, str):
-        return nodes.Transition(next_state=ret.value.value)
+        return ir.Transition(next_state=ret.value.value)
     raise ValueError(f"Unsupported transition: {ast.dump(ret)}")
 
 
-def _compile_transition_select(match: ast.Match) -> nodes.TransitionSelect:
+def _compile_transition_select(match: ast.Match) -> ir.TransitionSelect:
     """Compile a match statement to a TransitionSelect."""
     field = _ast_to_field_access(match.subject)
     cases = []
@@ -338,22 +333,22 @@ def _compile_transition_select(match: ast.Match) -> nodes.TransitionSelect:
             raise ValueError(f"Unsupported match pattern: {ast.dump(case.pattern)}")
 
         transition = _compile_transition(ret)
-        cases.append(nodes.SelectCase(value=value, next_state=transition.next_state))
+        cases.append(ir.SelectCase(value=value, next_state=transition.next_state))
 
-    return nodes.TransitionSelect(field=field, cases=tuple(cases))
+    return ir.TransitionSelect(field=field, cases=tuple(cases))
 
 
 # --- Control compilation ---
 
 
-def _compile_control(spec) -> nodes.ControlDecl:
+def _compile_control(spec) -> ir.ControlDecl:
     """Compile a @p4.control spec into a ControlDecl."""
     func_def = _parse_spec_ast(spec)
     params = _param_names(func_def)
 
-    actions: list[nodes.ActionDecl] = []
-    tables: list[nodes.TableDecl] = []
-    apply_body: list[nodes.Statement] = []
+    actions: list[ir.ActionDecl] = []
+    tables: list[ir.TableDecl] = []
+    apply_body: list[ir.Statement] = []
 
     for node in func_def.body:
         # @p4.action decorated function → ActionDecl
@@ -369,7 +364,7 @@ def _compile_control(spec) -> nodes.ControlDecl:
         else:
             apply_body.append(_ast_to_statement(node, params))
 
-    return nodes.ControlDecl(
+    return ir.ControlDecl(
         name=spec._p4_name,
         actions=tuple(actions),
         tables=tuple(tables),
@@ -385,9 +380,7 @@ def _has_p4_decorator(node: ast.FunctionDef, name: str) -> bool:
     return False
 
 
-def _compile_action(
-    func_def: ast.FunctionDef, block_params: set[str]
-) -> nodes.ActionDecl:
+def _compile_action(func_def: ast.FunctionDef, block_params: set[str]) -> ir.ActionDecl:
     """Compile a @p4.action function into an ActionDecl."""
     action_params = []
     for arg in func_def.args.args:
@@ -397,9 +390,7 @@ def _compile_action(
                 isinstance(arg.annotation, ast.Attribute)
                 and arg.annotation.attr == "bool"
             ):
-                action_params.append(
-                    nodes.ActionParam(name=arg.arg, type=nodes.BoolType())
-                )
+                action_params.append(ir.ActionParam(name=arg.arg, type=ir.BoolType()))
             # p4.bit(W) → BitType
             elif (
                 isinstance(arg.annotation, ast.Call)
@@ -408,7 +399,7 @@ def _compile_action(
             ):
                 width = arg.annotation.args[0].value
                 action_params.append(
-                    nodes.ActionParam(name=arg.arg, type=nodes.BitType(width))
+                    ir.ActionParam(name=arg.arg, type=ir.BitType(width))
                 )
             else:
                 raise ValueError(
@@ -421,7 +412,7 @@ def _compile_action(
         for node in func_def.body
         if (s := _ast_to_statement(node, block_params)) is not None
     )
-    return nodes.ActionDecl(name=func_def.name, params=tuple(action_params), body=body)
+    return ir.ActionDecl(name=func_def.name, params=tuple(action_params), body=body)
 
 
 def _is_table_call(node: ast.Assign) -> bool:
@@ -432,7 +423,7 @@ def _is_table_call(node: ast.Assign) -> bool:
     return isinstance(func, ast.Attribute) and func.attr == "table"
 
 
-def _compile_table(node: ast.Assign) -> nodes.TableDecl:
+def _compile_table(node: ast.Assign) -> ir.TableDecl:
     """Compile name = p4.table(...) into a TableDecl."""
     name = node.targets[0].id
     call = node.value
@@ -440,9 +431,9 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
     keys = ()
     actions = ()
     default_action = ""
-    default_action_args: tuple[nodes.Expression, ...] = ()
+    default_action_args: tuple[ir.Expression, ...] = ()
     size = None
-    const_entries: tuple[nodes.ConstEntry, ...] = ()
+    const_entries: tuple[ir.ConstEntry, ...] = ()
     implementation: str | None = None
 
     for kw in call.keywords:
@@ -477,7 +468,7 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
         elif kw.arg == "implementation":
             implementation = _compile_implementation(kw.value)
 
-    return nodes.TableDecl(
+    return ir.TableDecl(
         name=name,
         keys=keys,
         actions=actions,
@@ -489,7 +480,7 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
     )
 
 
-def _compile_table_keys(dict_node: ast.Dict) -> tuple[nodes.TableKey, ...]:
+def _compile_table_keys(dict_node: ast.Dict) -> tuple[ir.TableKey, ...]:
     """Compile a dict literal {field: match_kind} into TableKeys."""
     keys = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
@@ -499,13 +490,13 @@ def _compile_table_keys(dict_node: ast.Dict) -> tuple[nodes.TableKey, ...]:
             match_kind = val_node.attr
         else:
             raise ValueError(f"Unsupported match kind: {ast.dump(val_node)}")
-        keys.append(nodes.TableKey(field=field, match_kind=match_kind))
+        keys.append(ir.TableKey(field=field, match_kind=match_kind))
     return tuple(keys)
 
 
 def _compile_const_entries(
     dict_node: ast.Dict,
-) -> tuple[nodes.ConstEntry, ...]:
+) -> tuple[ir.ConstEntry, ...]:
     """Compile const_entries = {value: action(args), ...} into ConstEntry nodes."""
     entries = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
@@ -520,7 +511,7 @@ def _compile_const_entries(
         else:
             raise ValueError(f"Unsupported const_entries value: {ast.dump(val_node)}")
         entries.append(
-            nodes.ConstEntry(
+            ir.ConstEntry(
                 values=values, action_name=action_name, action_args=action_args
             )
         )
@@ -540,7 +531,7 @@ def _compile_implementation(node: ast.expr) -> str:
 # --- Deparser compilation ---
 
 
-def _compile_deparser(spec) -> nodes.DeparserDecl:
+def _compile_deparser(spec) -> ir.DeparserDecl:
     """Compile a @p4.deparser spec into a DeparserDecl."""
     func_def = _parse_spec_ast(spec)
     emit_order = []
@@ -554,4 +545,4 @@ def _compile_deparser(spec) -> nodes.DeparserDecl:
                 emit_order.append(arg)
                 continue
         raise ValueError(f"Deparser only supports pkt.emit() calls: {ast.dump(node)}")
-    return nodes.DeparserDecl(name=spec._p4_name, emit_order=tuple(emit_order))
+    return ir.DeparserDecl(name=spec._p4_name, emit_order=tuple(emit_order))

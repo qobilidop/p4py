@@ -3,9 +3,9 @@
 from absl.testing import absltest
 
 import p4py.lang as p4
+from p4py import ir as nodes
 from p4py.arch import v1model
 from p4py.compiler import compile
-from p4py.ir import nodes
 
 
 def _get_block(package, name):
