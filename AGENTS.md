@@ -10,9 +10,10 @@
 
 ## Scratch space
 
-`.agent_workspace/` is gitignored. Use it for temporary working documents,
-worktrees, and other ephemeral artifacts. Durable artifacts belong in code,
-tests, or `docs/`.
+`.agent_workspace/` is gitignored. Use it for all intermediate working
+documents: design specs, implementation plans, brainstorming notes, and other
+ephemeral artifacts that support the process but are not the deliverable.
+Durable artifacts belong in code, tests, or `docs/`.
 
 ## References
 
