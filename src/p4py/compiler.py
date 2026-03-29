@@ -76,7 +76,11 @@ def _compile_declarations(declarations) -> tuple:
 def _compile_types(headers_struct: type) -> tuple[ir.HeaderType, ...]:
     """Extract HeaderType IR nodes from a headers struct class."""
     result = []
+    seen: set[str] = set()
     for _, header_cls in headers_struct._p4_members:
+        if header_cls._p4_name in seen:
+            continue
+        seen.add(header_cls._p4_name)
         fields = []
         for name, bt in header_cls._p4_fields:
             if hasattr(bt, "_p4_kind") and bt._p4_kind in ("typedef", "newtype"):
@@ -279,9 +283,19 @@ def _ast_call_to_statement(call: ast.Call, params: set[str]) -> ir.Statement:
     # obj.method(args) — e.g., pkt.extract(hdr.ethernet)
     if isinstance(call.func, ast.Attribute):
         attr = call.func
-        # table.apply()
-        if attr.attr == "apply" and isinstance(attr.value, ast.Name):
+        # table.apply() (no args)
+        if attr.attr == "apply" and isinstance(attr.value, ast.Name) and not call.args:
             return ir.TableApply(table_name=attr.value.id)
+        # control.apply(args) — control instantiation apply
+        if (
+            attr.attr == "apply"
+            and isinstance(attr.value, ast.Name)
+            and attr.value.id not in params
+            and call.args
+        ):
+            obj = ir.FieldAccess(path=(attr.value.id,))
+            args = tuple(_ast_to_expression(a) for a in call.args)
+            return ir.MethodCall(object=obj, method="apply", args=args)
         # Module-qualified function: name.func(args) where name is not a
         # block parameter (e.g. v1model.mark_to_drop).  Strip the module
         # prefix and emit a plain FunctionCall.

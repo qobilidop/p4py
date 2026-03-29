@@ -1,0 +1,15 @@
+load("@rules_python//python:defs.bzl", "py_library")
+load("//tests/infra:golden_test.bzl", "golden_test")
+
+py_library(
+    name = "wbb",
+    srcs = glob(["**/*.py"]),
+    deps = ["//src/p4py"],
+)
+
+golden_test(
+    name = "wbb_golden_test",
+    golden_file = "wbb.p4",
+    p4_library = ":wbb",
+    p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
+)
