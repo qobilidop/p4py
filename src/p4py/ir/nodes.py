@@ -120,6 +120,22 @@ class SwitchAction:
     cases: tuple[SwitchActionCase, ...]
 
 
+@dataclass(frozen=True)
+class ChecksumVerify:
+    condition: Expression
+    data: tuple[FieldAccess, ...]
+    checksum: FieldAccess
+    algo: str
+
+
+@dataclass(frozen=True)
+class ChecksumUpdate:
+    condition: Expression
+    data: tuple[FieldAccess, ...]
+    checksum: FieldAccess
+    algo: str
+
+
 Statement = (
     Assignment
     | MethodCall
@@ -128,6 +144,8 @@ Statement = (
     | TableApply
     | IfElse
     | SwitchAction
+    | ChecksumVerify
+    | ChecksumUpdate
 )
 
 
@@ -226,3 +244,5 @@ class Program:
     ingress: ControlDecl
     deparser: DeparserDecl
     egress: ControlDecl | None = None
+    verify_checksum: ControlDecl | None = None
+    compute_checksum: ControlDecl | None = None

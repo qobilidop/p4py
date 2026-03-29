@@ -18,6 +18,16 @@ def compile(pipeline: V1Switch) -> nodes.Program:
     parser_ir = _compile_parser(pipeline.parser)
     ingress_ir = _compile_control(pipeline.ingress)
     egress_ir = _compile_control(pipeline.egress) if pipeline.egress else None
+    verify_ir = (
+        _compile_checksum_control(pipeline.verify_checksum)
+        if pipeline.verify_checksum
+        else None
+    )
+    compute_ir = (
+        _compile_checksum_control(pipeline.compute_checksum)
+        if pipeline.compute_checksum
+        else None
+    )
     deparser_ir = _compile_deparser(pipeline.deparser)
     return nodes.Program(
         headers=headers_ir,
@@ -26,6 +36,8 @@ def compile(pipeline: V1Switch) -> nodes.Program:
         ingress=ingress_ir,
         deparser=deparser_ir,
         egress=egress_ir,
+        verify_checksum=verify_ir,
+        compute_checksum=compute_ir,
     )
 
 
@@ -405,6 +417,75 @@ def _compile_table_keys(dict_node: ast.Dict) -> tuple[nodes.TableKey, ...]:
             raise ValueError(f"Unsupported match kind: {ast.dump(val_node)}")
         keys.append(nodes.TableKey(field=field, match_kind=match_kind))
     return tuple(keys)
+
+
+# --- Checksum control compilation ---
+
+
+def _compile_checksum_control(spec) -> nodes.ControlDecl:
+    """Compile a checksum control (verify_checksum or compute_checksum)."""
+    func_def = _parse_spec_ast(spec)
+    params = _param_names(func_def)
+    apply_body: list[nodes.Statement] = []
+
+    for node in func_def.body:
+        if isinstance(node, ast.Pass):
+            continue
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            stmt = _compile_checksum_call(node.value)
+            if stmt is not None:
+                apply_body.append(stmt)
+                continue
+        apply_body.append(_ast_to_statement(node, params))
+
+    return nodes.ControlDecl(
+        name=spec._p4_name,
+        actions=(),
+        tables=(),
+        apply_body=tuple(apply_body),
+    )
+
+
+def _compile_checksum_call(
+    call: ast.Call,
+) -> nodes.ChecksumVerify | nodes.ChecksumUpdate | None:
+    """Try to compile a function call as a checksum extern."""
+    if not isinstance(call.func, ast.Attribute):
+        return None
+    func_name = call.func.attr
+    if func_name not in ("verify_checksum", "update_checksum"):
+        return None
+
+    # Parse keyword arguments.
+    kwargs: dict[str, ast.expr] = {}
+    for kw in call.keywords:
+        kwargs[kw.arg] = kw.value
+
+    condition = _ast_to_expression(kwargs["condition"])
+    checksum = _ast_to_field_access(kwargs["checksum"])
+
+    # data is a list of field accesses.
+    data_node = kwargs["data"]
+    if isinstance(data_node, ast.List):
+        data = tuple(_ast_to_field_access(elt) for elt in data_node.elts)
+    else:
+        raise ValueError(f"Checksum data must be a list literal: {ast.dump(data_node)}")
+
+    # algo is v1model.HashAlgorithm.csum16 → extract the final attribute name.
+    algo_node = kwargs["algo"]
+    if isinstance(algo_node, ast.Attribute):
+        algo = algo_node.attr
+    else:
+        raise ValueError(f"Unsupported algo: {ast.dump(algo_node)}")
+
+    if func_name == "verify_checksum":
+        return nodes.ChecksumVerify(
+            condition=condition, data=data, checksum=checksum, algo=algo
+        )
+    else:
+        return nodes.ChecksumUpdate(
+            condition=condition, data=data, checksum=checksum, algo=algo
+        )
 
 
 # --- Deparser compilation ---

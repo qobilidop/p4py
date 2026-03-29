@@ -80,6 +80,10 @@ def simulate(
     )
 
     _run_parser(state, program.parser)
+
+    if program.verify_checksum is not None:
+        _run_control(state, program.verify_checksum, table_entries)
+
     _run_control(state, program.ingress, table_entries)
 
     if state.std_meta["egress_spec"] == _DROP_PORT:
@@ -87,6 +91,9 @@ def simulate(
 
     if program.egress is not None:
         _run_control(state, program.egress, table_entries)
+
+    if program.compute_checksum is not None:
+        _run_control(state, program.compute_checksum, table_entries)
 
     output = _run_deparser(state, program.deparser)
     return SimResult(
@@ -170,6 +177,10 @@ def _exec_control_statement(
                 break
     elif isinstance(stmt, nodes.FunctionCall):
         _exec_action_by_name(state, stmt.name, {}, ctx)
+    elif isinstance(stmt, nodes.ChecksumVerify):
+        _exec_checksum_verify(state, stmt)
+    elif isinstance(stmt, nodes.ChecksumUpdate):
+        _exec_checksum_update(state, stmt)
     else:
         raise ValueError(f"Unsupported control statement: {stmt}")
 
@@ -349,6 +360,63 @@ def _write_bits(data: bytearray, bit_offset: int, width: int, value: int) -> Non
             data[byte_idx] &= ~(1 << bit_idx)
 
 
+def _compute_csum16(field_values: list[tuple[int, int]]) -> int:
+    """Compute 16-bit ones' complement checksum (RFC 1071).
+
+    Args:
+        field_values: List of (value, width_in_bits) pairs.
+    """
+    # Concatenate all fields into a single bit string, then sum 16-bit words.
+    total_bits = 0
+    combined = 0
+    for value, width in field_values:
+        combined = (combined << width) | (value & ((1 << width) - 1))
+        total_bits += width
+
+    # Pad to 16-bit boundary.
+    if total_bits % 16:
+        pad = 16 - (total_bits % 16)
+        combined <<= pad
+        total_bits += pad
+
+    # Sum 16-bit words.
+    total = 0
+    num_words = total_bits // 16
+    for i in range(num_words):
+        shift = (num_words - 1 - i) * 16
+        word = (combined >> shift) & 0xFFFF
+        total += word
+
+    # Fold carry bits.
+    while total >> 16:
+        total = (total & 0xFFFF) + (total >> 16)
+
+    return (~total) & 0xFFFF
+
+
+def _exec_checksum_verify(state: _SimState, stmt: nodes.ChecksumVerify) -> None:
+    """Execute verify_checksum — currently a no-op (verification only)."""
+    # In a real switch, this would mark the packet for drop on mismatch.
+    # For simulation, we skip verification — update_checksum is what matters.
+    pass
+
+
+def _exec_checksum_update(state: _SimState, stmt: nodes.ChecksumUpdate) -> None:
+    """Execute update_checksum — recompute and write back the checksum."""
+    cond_val = _eval_expression(state, stmt.condition, {})
+    if not cond_val:
+        return
+
+    field_values: list[tuple[int, int]] = []
+    for fa in stmt.data:
+        value = _eval_expression(state, fa, {})
+        width = _resolve_field_width(state, fa)
+        field_values.append((value, width))
+
+    checksum = _compute_csum16(field_values)
+    _set_field(state, stmt.checksum, checksum)
+
+
 def _eval_expression(
     state: _SimState, expr: nodes.Expression, locals_: dict[str, int]
 ) -> int:
@@ -365,6 +433,8 @@ def _eval_expression(
         if expr.op == "-":
             return left - right
         raise ValueError(f"Unknown op: {expr.op}")
+    if isinstance(expr, nodes.IsValid):
+        return int(_eval_is_valid(state, expr))
     raise ValueError(f"Cannot evaluate: {expr}")
 
 

@@ -29,6 +29,39 @@ class _Extern:
 mark_to_drop = _Extern("mark_to_drop")
 
 
+class _HashAlgorithm:
+    """v1model hash algorithm enum."""
+
+    def __init__(self, name: str) -> None:
+        self._p4_name = name
+
+    def __repr__(self) -> str:
+        return f"HashAlgorithm.{self._p4_name}"
+
+
+class HashAlgorithm:
+    csum16 = _HashAlgorithm("csum16")
+
+
+class _ChecksumExtern:
+    """A v1model checksum extern (verify_checksum or update_checksum)."""
+
+    def __init__(self, name: str) -> None:
+        self._p4_kind = "checksum_extern"
+        self._p4_name = name
+
+    def __call__(self, **kwargs):
+        # Called at DSL capture time; the compiler reads the AST, not this.
+        pass
+
+    def __repr__(self) -> str:
+        return self._p4_name
+
+
+verify_checksum = _ChecksumExtern("verify_checksum")
+update_checksum = _ChecksumExtern("update_checksum")
+
+
 @dataclass
 class V1Switch:
     """v1model pipeline with field order matching v1model.p4.

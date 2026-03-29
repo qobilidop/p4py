@@ -22,10 +22,10 @@ def emit(program: nodes.Program) -> str:
         _emit_struct(lines, s)
 
     _emit_parser(lines, program.parser)
-    _emit_verify_checksum(lines)
+    _emit_verify_checksum(lines, program.verify_checksum)
     _emit_control(lines, program.ingress)
     _emit_egress(lines, program.egress)
-    _emit_compute_checksum(lines)
+    _emit_compute_checksum(lines, program.compute_checksum)
     _emit_deparser(lines, program.deparser)
     _emit_main(lines, program)
 
@@ -138,13 +138,16 @@ def _emit_deparser(lines: list[str], d: nodes.DeparserDecl) -> None:
     lines.append("")
 
 
-def _emit_verify_checksum(lines: list[str]) -> None:
-    lines.append(
-        "control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {"
-    )
-    lines.append("    apply {}")
-    lines.append("}")
-    lines.append("")
+def _emit_verify_checksum(lines: list[str], vc: nodes.ControlDecl | None) -> None:
+    if vc is not None:
+        _emit_checksum_control(lines, vc)
+    else:
+        lines.append(
+            "control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {"
+        )
+        lines.append("    apply {}")
+        lines.append("}")
+        lines.append("")
 
 
 def _emit_egress(lines: list[str], egress: nodes.ControlDecl | None) -> None:
@@ -159,23 +162,68 @@ def _emit_egress(lines: list[str], egress: nodes.ControlDecl | None) -> None:
         lines.append("")
 
 
-def _emit_compute_checksum(lines: list[str]) -> None:
-    lines.append(
-        "control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {"
-    )
-    lines.append("    apply {}")
+def _emit_compute_checksum(lines: list[str], cc: nodes.ControlDecl | None) -> None:
+    if cc is not None:
+        _emit_checksum_control(lines, cc)
+    else:
+        lines.append(
+            "control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {"
+        )
+        lines.append("    apply {}")
+        lines.append("}")
+        lines.append("")
+
+
+def _emit_checksum_control(lines: list[str], c: nodes.ControlDecl) -> None:
+    lines.append(f"control {c.name}(inout headers_t hdr, inout metadata_t meta) {{")
+    lines.append("    apply {")
+    for stmt in c.apply_body:
+        _emit_checksum_statement(lines, stmt)
+    lines.append("    }")
     lines.append("}")
     lines.append("")
 
 
+def _emit_checksum_statement(lines: list[str], stmt: nodes.Statement) -> None:
+    if isinstance(stmt, nodes.ChecksumVerify):
+        _emit_checksum_call(lines, "verify_checksum", stmt)
+    elif isinstance(stmt, nodes.ChecksumUpdate):
+        _emit_checksum_call(lines, "update_checksum", stmt)
+    else:
+        lines.append(f"        {_emit_statement(stmt)}")
+
+
+def _emit_checksum_call(
+    lines: list[str],
+    func_name: str,
+    stmt: nodes.ChecksumVerify | nodes.ChecksumUpdate,
+) -> None:
+    cond = _emit_expression(stmt.condition)
+    data_fields = ", ".join(_emit_field_access(f) for f in stmt.data)
+    checksum = _emit_field_access(stmt.checksum)
+    lines.append(f"        {func_name}(")
+    lines.append(f"            {cond},")
+    lines.append(f"            {{ {data_fields} }},")
+    lines.append(f"            {checksum},")
+    lines.append(f"            HashAlgorithm.{stmt.algo});")
+
+
 def _emit_main(lines: list[str], program: nodes.Program) -> None:
     egress_name = program.egress.name if program.egress else "MyEgress"
+    vc_name = (
+        program.verify_checksum.name if program.verify_checksum else "MyVerifyChecksum"
+    )
+    cc_name = (
+        program.compute_checksum.name
+        if program.compute_checksum
+        else "MyComputeChecksum"
+    )
     lines.append("V1Switch(")
     lines.append(f"    {program.parser.name}(),")
-    lines.append("    MyVerifyChecksum(),")
+    lines.append(f"    {vc_name}(),")
     lines.append(f"    {program.ingress.name}(),")
     lines.append(f"    {egress_name}(),")
-    lines.append("    MyComputeChecksum(),")
+    lines.append(f"    {cc_name}(),")
     lines.append(f"    {program.deparser.name}()")
     lines.append(") main;")
 

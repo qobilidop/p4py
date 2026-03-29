@@ -11,3 +11,9 @@ py_test(
     srcs = ["test_egress_emit.py"],
     deps = ["//src/p4py"],
 )
+
+py_test(
+    name = "test_checksum_emit",
+    srcs = ["test_checksum_emit.py"],
+    deps = ["//src/p4py"],
+)
