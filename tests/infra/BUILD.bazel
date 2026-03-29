@@ -14,3 +14,22 @@ py_test(
     srcs = ["stf_runner_test.py"],
     deps = [":stf_runner"],
 )
+
+exports_files(
+    ["stf_sim_runner.py"],
+    visibility = [
+        "//tests:__subpackages__",
+    ],
+)
+
+py_library(
+    name = "stf_sim_runner",
+    srcs = ["stf_sim_runner.py"],
+    visibility = [
+        "//tests:__subpackages__",
+    ],
+    deps = [
+        ":stf_runner",
+        "//src/p4py",
+    ],
+)

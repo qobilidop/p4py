@@ -8,8 +8,9 @@ py_library(
 )
 
 stf_test(
-    name = "basic_forward_test",
-    p4_program = "basic_forward.p4",
+    name = "basic_forward_stf_test",
+    p4_module = "tests.e2e.examples.basic_forward.basic_forward",
+    p4_library = ":basic_forward",
     stf_file = "basic_forward.stf",
 )
 
@@ -17,11 +18,7 @@ py_test(
     name = "basic_forward_testgen_test",
     timeout = "moderate",
     srcs = ["basic_forward_testgen_test.py"],
-    local = True,
-    tags = [
-        "e2e",
-        "local",
-    ],
+    tags = ["e2e"],
     deps = [
         ":basic_forward",
         "//src/p4py",
