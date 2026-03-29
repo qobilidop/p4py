@@ -12,7 +12,7 @@ ether_type_t = p4.typedef(p4.bit(16), "ether_type_t")
 
 # -- Consts --
 
-INTERNAL_VLAN_ID = p4.const(vlan_id_t, 0xfff, "INTERNAL_VLAN_ID")
+INTERNAL_VLAN_ID = p4.const(vlan_id_t, 0xFFF, "INTERNAL_VLAN_ID")
 NO_VLAN_ID = p4.const(vlan_id_t, 0x000, "NO_VLAN_ID")
 
 # -- Protocol headers --

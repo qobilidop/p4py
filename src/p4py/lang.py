@@ -167,7 +167,11 @@ class struct:
                 members.append((name, ann))
             elif isinstance(ann, type) and issubclass(ann, (header, struct)):
                 members.append((name, ann))
-            elif isinstance(ann, type) and hasattr(ann, "_p4_kind") and ann._p4_kind == "enum":
+            elif (
+                isinstance(ann, type)
+                and hasattr(ann, "_p4_kind")
+                and ann._p4_kind == "enum"
+            ):
                 members.append((name, ann))
             else:
                 raise TypeError(

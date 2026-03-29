@@ -1,8 +1,8 @@
 # SAI P4 tests
 
 End-to-end tests translating programs from the
-[sonic-net/sonic-pins](https://github.com/sonic-net/sonic-pins) `sai_p4/`
-corpus into P4Py.
+[sonic-net/sonic-pins](https://github.com/sonic-net/sonic-pins) `sai_p4/` corpus
+into P4Py.
 
 ## Background
 
@@ -16,12 +16,12 @@ instantiations" architecture:
 
 There are four instantiations, from simplest to most complex:
 
-| Instantiation | Description |
-|---------------|-------------|
-| `wbb.p4` | WAN Building Block — trivial pipeline, single ACL table |
-| `tor.p4` | Top-of-rack — full routing, ACL, mirroring, VLAN |
-| `middleblock.p4` | Spine switch — similar to ToR |
-| `fabric_border_router.p4` | Border router — all features enabled |
+| Instantiation             | Description                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `wbb.p4`                  | WAN Building Block — trivial pipeline, single ACL table |
+| `tor.p4`                  | Top-of-rack — full routing, ACL, mirroring, VLAN        |
+| `middleblock.p4`          | Spine switch — similar to ToR                           |
+| `fabric_border_router.p4` | Border router — all features enabled                    |
 
 ## Approach
 

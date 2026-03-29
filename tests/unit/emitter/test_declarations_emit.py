@@ -53,7 +53,7 @@ class TestEmitEnum(absltest.TestCase):
 
 class TestEmitConst(absltest.TestCase):
     def test_emit(self):
-        c = ir.ConstDecl(name="INTERNAL_VLAN_ID", type_name="vlan_id_t", value=0xfff)
+        c = ir.ConstDecl(name="INTERNAL_VLAN_ID", type_name="vlan_id_t", value=0xFFF)
         lines = []
         _emit_const(lines, c)
         self.assertEqual(lines, ["const vlan_id_t INTERNAL_VLAN_ID = 0x0fff;"])

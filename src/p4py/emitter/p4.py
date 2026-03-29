@@ -95,9 +95,7 @@ def _emit_control_block(lines: list[str], c: ir.ControlDecl, sig: str) -> None:
         lines.append(f"    bit<{lv.type.width}> {lv.name} = {lv.init_value};")
         lines.append("")
     for dc in c.direct_counters:
-        lines.append(
-            f"    direct_counter(CounterType.{dc.counter_type}) {dc.name};"
-        )
+        lines.append(f"    direct_counter(CounterType.{dc.counter_type}) {dc.name};")
         lines.append("")
     for dm in c.direct_meters:
         lines.append(

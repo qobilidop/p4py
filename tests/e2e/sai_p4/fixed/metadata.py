@@ -76,9 +76,7 @@ acl_metadata_t = p4.typedef(p4.bit(ACL_METADATA_BITWIDTH), "acl_metadata_t")
 multicast_group_id_t = p4.typedef(
     p4.bit(MULTICAST_GROUP_ID_BITWIDTH), "multicast_group_id_t"
 )
-replica_instance_t = p4.typedef(
-    p4.bit(REPLICA_INSTANCE_BITWIDTH), "replica_instance_t"
-)
+replica_instance_t = p4.typedef(p4.bit(REPLICA_INSTANCE_BITWIDTH), "replica_instance_t")
 
 # -- Packet IO headers --
 

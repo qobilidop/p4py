@@ -49,17 +49,19 @@ def _compile_declarations(declarations) -> tuple:
             continue
         kind = decl._p4_kind
         if kind == "typedef":
-            result.append(ir.TypedefDecl(name=decl._p4_name, type=ir.BitType(decl.width)))
+            result.append(
+                ir.TypedefDecl(name=decl._p4_name, type=ir.BitType(decl.width))
+            )
         elif kind == "newtype":
-            result.append(ir.NewtypeDecl(name=decl._p4_name, type=ir.BitType(decl.width)))
+            result.append(
+                ir.NewtypeDecl(name=decl._p4_name, type=ir.BitType(decl.width))
+            )
         elif kind == "enum":
             result.append(
                 ir.EnumDecl(
                     name=decl._p4_name,
                     underlying_type=ir.BitType(decl._p4_underlying.width),
-                    members=tuple(
-                        ir.EnumMember(n, v) for n, v in decl._p4_members
-                    ),
+                    members=tuple(ir.EnumMember(n, v) for n, v in decl._p4_members),
                 )
             )
         elif kind == "const":
@@ -110,7 +112,11 @@ def _compile_structs(pipeline) -> tuple[ir.StructType, ...]:
         for name, ann in s._p4_members:
             if isinstance(ann, type) and issubclass(ann, (p4.header, p4_struct)):
                 members.append(ir.StructMember(name, ann._p4_name))
-            elif hasattr(ann, "_p4_kind") and ann._p4_kind in ("typedef", "newtype", "enum"):
+            elif hasattr(ann, "_p4_kind") and ann._p4_kind in (
+                "typedef",
+                "newtype",
+                "enum",
+            ):
                 members.append(ir.StructMember(name, ann._p4_name))
             elif isinstance(ann, p4.BoolType):
                 members.append(ir.StructMember(name, ir.BoolType()))

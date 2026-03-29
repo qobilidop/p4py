@@ -37,7 +37,9 @@ class HeaderType:
 @dataclass(frozen=True)
 class StructMember:
     name: str
-    type: BitType | BoolType | str  # BitType for bit<W>, BoolType for bool, str for named type
+    type: (
+        BitType | BoolType | str
+    )  # BitType for bit<W>, BoolType for bool, str for named type
 
 
 @dataclass(frozen=True)
