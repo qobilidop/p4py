@@ -308,6 +308,16 @@ class TestCompareOp(absltest.TestCase):
         self.assertEqual(expr.op, "==")
 
 
+class TestLogicalOp(absltest.TestCase):
+    def test_logical_op(self):
+        expr = nodes.LogicalOp(
+            op="&&",
+            left=nodes.BoolLiteral(value=True),
+            right=nodes.BoolLiteral(value=False),
+        )
+        self.assertEqual(expr.op, "&&")
+
+
 class TestNodesFrozen(absltest.TestCase):
     def test_nodes_are_frozen(self):
         t = nodes.BitType(width=8)

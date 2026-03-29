@@ -168,6 +168,13 @@ class CompareOp:
     right: Expression
 
 
+@dataclass(frozen=True)
+class LogicalOp:
+    op: str  # "&&" or "||"
+    left: Expression
+    right: Expression
+
+
 Expression = (
     FieldAccess
     | IntLiteral
@@ -181,6 +188,7 @@ Expression = (
     | ConstRef
     | UnaryOp
     | CompareOp
+    | LogicalOp
 )
 
 
