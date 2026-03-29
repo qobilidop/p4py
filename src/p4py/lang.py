@@ -194,6 +194,7 @@ class _MatchKind:
 exact = _MatchKind("exact")
 lpm = _MatchKind("lpm")
 ternary = _MatchKind("ternary")
+optional = _MatchKind("optional")
 
 
 # --- bool ---
