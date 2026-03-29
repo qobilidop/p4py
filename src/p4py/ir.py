@@ -25,6 +25,7 @@ class BoolType:
 class HeaderField:
     name: str
     type: BitType
+    type_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,7 +37,7 @@ class HeaderType:
 @dataclass(frozen=True)
 class StructMember:
     name: str
-    type: BitType | str  # BitType for bit<W> fields, str for header type name
+    type: BitType | BoolType | str  # BitType for bit<W>, BoolType for bool, str for named type
 
 
 @dataclass(frozen=True)
@@ -316,3 +317,4 @@ class Package:
     headers: tuple[HeaderType, ...]
     structs: tuple[StructType, ...]
     blocks: tuple[BlockEntry, ...]
+    declarations: tuple = ()

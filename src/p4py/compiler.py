@@ -15,6 +15,7 @@ def compile(pipeline) -> ir.Package:
     arch = pipeline.arch
     headers_ir = _compile_types(pipeline.headers)
     structs_ir = _compile_structs(pipeline)
+    declarations_ir = _compile_declarations(getattr(pipeline, "declarations", ()))
 
     blocks = []
     for spec in arch.pipeline:
@@ -36,23 +37,59 @@ def compile(pipeline) -> ir.Package:
         headers=headers_ir,
         structs=structs_ir,
         blocks=tuple(blocks),
+        declarations=declarations_ir,
     )
+
+
+def _compile_declarations(declarations) -> tuple:
+    """Convert DSL declaration objects to IR declaration nodes."""
+    result = []
+    for decl in declarations:
+        if not hasattr(decl, "_p4_kind"):
+            continue
+        kind = decl._p4_kind
+        if kind == "typedef":
+            result.append(ir.TypedefDecl(name=decl._p4_name, type=ir.BitType(decl.width)))
+        elif kind == "newtype":
+            result.append(ir.NewtypeDecl(name=decl._p4_name, type=ir.BitType(decl.width)))
+        elif kind == "enum":
+            result.append(
+                ir.EnumDecl(
+                    name=decl._p4_name,
+                    underlying_type=ir.BitType(decl._p4_underlying.width),
+                    members=tuple(
+                        ir.EnumMember(n, v) for n, v in decl._p4_members
+                    ),
+                )
+            )
+        elif kind == "const":
+            result.append(
+                ir.ConstDecl(
+                    name=decl._p4_name,
+                    type_name=decl._p4_type_name,
+                    value=decl._p4_value,
+                )
+            )
+    return tuple(result)
 
 
 def _compile_types(headers_struct: type) -> tuple[ir.HeaderType, ...]:
     """Extract HeaderType IR nodes from a headers struct class."""
     result = []
     for _, header_cls in headers_struct._p4_members:
-        fields = tuple(
-            ir.HeaderField(name, ir.BitType(bt.width))
-            for name, bt in header_cls._p4_fields
-        )
-        result.append(ir.HeaderType(name=header_cls._p4_name, fields=fields))
+        fields = []
+        for name, bt in header_cls._p4_fields:
+            if hasattr(bt, "_p4_kind") and bt._p4_kind in ("typedef", "newtype"):
+                fields.append(ir.HeaderField(name, ir.BitType(bt.width), bt._p4_name))
+            else:
+                fields.append(ir.HeaderField(name, ir.BitType(bt.width)))
+        result.append(ir.HeaderType(name=header_cls._p4_name, fields=tuple(fields)))
     return tuple(result)
 
 
 def _compile_structs(pipeline) -> tuple[ir.StructType, ...]:
     """Compile struct types to IR."""
+    import p4py.lang as p4
     from p4py.lang import struct as p4_struct
 
     result = []
@@ -67,7 +104,13 @@ def _compile_structs(pipeline) -> tuple[ir.StructType, ...]:
                 _compile_one(ann)
         members = []
         for name, ann in s._p4_members:
-            if hasattr(ann, "width"):
+            if isinstance(ann, type) and issubclass(ann, (p4.header, p4_struct)):
+                members.append(ir.StructMember(name, ann._p4_name))
+            elif hasattr(ann, "_p4_kind") and ann._p4_kind in ("typedef", "newtype", "enum"):
+                members.append(ir.StructMember(name, ann._p4_name))
+            elif isinstance(ann, p4.BoolType):
+                members.append(ir.StructMember(name, ir.BoolType()))
+            elif hasattr(ann, "width"):
                 members.append(ir.StructMember(name, ir.BitType(ann.width)))
             else:
                 members.append(ir.StructMember(name, ann._p4_name))

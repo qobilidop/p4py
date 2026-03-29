@@ -18,6 +18,18 @@ def emit(package: ir.Package) -> str:
     lines.append(f"#include <{arch.include}>")
     lines.append("")
 
+    for decl in package.declarations:
+        if isinstance(decl, ir.TypedefDecl):
+            _emit_typedef(lines, decl)
+        elif isinstance(decl, ir.NewtypeDecl):
+            _emit_newtype(lines, decl)
+        elif isinstance(decl, ir.EnumDecl):
+            _emit_enum(lines, decl)
+        elif isinstance(decl, ir.ConstDecl):
+            _emit_const(lines, decl)
+    if package.declarations:
+        lines.append("")
+
     for h in package.headers:
         _emit_header(lines, h)
     for s in package.structs:
@@ -109,7 +121,10 @@ def _emit_deparser_block(lines: list[str], d: ir.DeparserDecl, sig: str) -> None
 def _emit_header(lines: list[str], h: ir.HeaderType) -> None:
     lines.append(f"header {h.name} {{")
     for field in h.fields:
-        lines.append(f"    bit<{field.type.width}> {field.name};")
+        if field.type_name:
+            lines.append(f"    {field.type_name} {field.name};")
+        else:
+            lines.append(f"    bit<{field.type.width}> {field.name};")
     lines.append("}")
     lines.append("")
 
@@ -119,6 +134,8 @@ def _emit_struct(lines: list[str], s: ir.StructType) -> None:
     for member in s.members:
         if isinstance(member.type, ir.BitType):
             lines.append(f"    bit<{member.type.width}> {member.name};")
+        elif isinstance(member.type, ir.BoolType):
+            lines.append(f"    bool {member.name};")
         else:
             lines.append(f"    {member.type} {member.name};")
     lines.append("}")

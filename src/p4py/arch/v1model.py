@@ -244,6 +244,7 @@ class V1Switch:
     egress: _Spec | None = None
     compute_checksum: _Spec | None = None
     deparser: _Spec | None = None
+    declarations: tuple = ()
 
     def __post_init__(self) -> None:
         self.arch: Architecture = _V1MODEL_ARCH
