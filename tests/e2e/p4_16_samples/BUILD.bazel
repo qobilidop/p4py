@@ -41,3 +41,9 @@ golden_test(
     p4_library = ":init_ebpf",
     p4_module = "tests.e2e.p4_16_samples.init_ebpf",
 )
+
+p4testgen_test(
+    name = "init_ebpf_p4testgen_test",
+    p4_library = ":init_ebpf",
+    p4_module = "tests.e2e.p4_16_samples.init_ebpf",
+)

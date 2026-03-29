@@ -31,29 +31,39 @@ def _find_p4include(p4testgen_path: str) -> str:
     return os.path.join(p4c_root, "p4include")
 
 
-def _run_p4testgen(p4testgen_path: str, p4_path: str, out_dir: str) -> list[str]:
+def _run_p4testgen(
+    p4testgen_path: str,
+    p4_path: str,
+    out_dir: str,
+    target: str = "bmv2",
+    arch: str = "v1model",
+) -> list[str]:
     """Run p4testgen on a P4 file. Returns paths to generated STF files."""
     p4include = _find_p4include(p4testgen_path)
-    result = subprocess.run(
-        [
-            p4testgen_path,
-            "-I",
-            p4include,
-            "--target",
-            "bmv2",
-            "--arch",
-            "v1model",
-            "--test-backend",
-            "stf",
-            "--max-tests",
-            "0",
-            "--out-dir",
-            out_dir,
-            p4_path,
-        ],
-        capture_output=True,
-        text=True,
-    )
+    cmd = [
+        p4testgen_path,
+        "-I",
+        p4include,
+    ]
+    if target == "ebpf":
+        # eBPF model includes are in a separate directory.
+        p4c_root = os.path.dirname(os.path.dirname(os.path.dirname(p4testgen_path)))
+        ebpf_include = os.path.join(p4c_root, "backends", "ebpf", "p4include")
+        cmd.extend(["-I", ebpf_include])
+    cmd.extend([
+        "--target",
+        target,
+        "--arch",
+        arch,
+        "--test-backend",
+        "stf",
+        "--max-tests",
+        "0",
+        "--out-dir",
+        out_dir,
+        p4_path,
+    ])
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"p4testgen failed:\n{result.stderr}")
     return sorted(
@@ -67,6 +77,14 @@ def run_p4testgen_test(module_path: str, p4testgen_path: str) -> bool:
     program = compile(mod.main)
     p4_source = emit(program)
 
+    # Detect target/arch from program type.
+    from p4py.ir.nodes import EbpfProgram
+
+    if isinstance(program, EbpfProgram):
+        target, arch = "ebpf", "ebpf"
+    else:
+        target, arch = "bmv2", "v1model"
+
     passed = True
     with tempfile.TemporaryDirectory() as tmpdir:
         p4_path = os.path.join(tmpdir, "program.p4")
@@ -75,7 +93,9 @@ def run_p4testgen_test(module_path: str, p4testgen_path: str) -> bool:
 
         testgen_dir = os.path.join(tmpdir, "testgen")
         os.makedirs(testgen_dir)
-        stf_files = _run_p4testgen(p4testgen_path, p4_path, testgen_dir)
+        stf_files = _run_p4testgen(
+            p4testgen_path, p4_path, testgen_dir, target=target, arch=arch
+        )
         if not stf_files:
             print("FAIL: p4testgen produced no tests")
             return False
