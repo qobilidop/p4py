@@ -11,20 +11,20 @@ py_library(
 
 golden_test(
     name = "basic_forward_golden_test",
-    p4_module = "examples.basic_forward.basic_forward",
+    p4_module = "examples.basic_forward",
     p4_library = ":basic_forward",
     golden_file = "basic_forward.p4",
 )
 
 stf_test(
     name = "basic_forward_stf_test",
-    p4_module = "examples.basic_forward.basic_forward",
+    p4_module = "examples.basic_forward",
     p4_library = ":basic_forward",
     stf_file = "basic_forward.stf",
 )
 
 p4testgen_test(
     name = "basic_forward_p4testgen_test",
-    p4_module = "examples.basic_forward.basic_forward",
+    p4_module = "examples.basic_forward",
     p4_library = ":basic_forward",
 )
