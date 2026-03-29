@@ -1,5 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_library")
 load("//tests/infra:golden_test.bzl", "golden_test")
+load("//tests/infra:p4testgen_test.bzl", "p4testgen_test")
 
 py_library(
     name = "wbb",
@@ -14,6 +15,10 @@ golden_test(
     p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
 )
 
-# TODO: Add p4testgen test once sub-control instantiation is supported.
-# The acl_wbb_ingress control is called from ingress but not emitted as a
-# standalone control block. P4Testgen fails with "declaration not found".
+# TODO: Enable once action method calls (meter.read, counter.count) and
+# module-scoped extern calls (v1model.clone) emit correctly in sub-controls.
+# p4testgen_test(
+#     name = "wbb_p4testgen_test",
+#     p4_library = ":wbb",
+#     p4_module = "tests.e2e.sai_p4.instantiations.google.wbb",
+# )

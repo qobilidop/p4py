@@ -76,6 +76,7 @@ main = V1Switch(
     egress=egress,
     compute_checksum=compute_ipv4_checksum,
     deparser=packet_deparser,
+    sub_controls=(acl_wbb_ingress,),
     declarations=(
         # Typedefs from headers.
         ethernet_addr_t,

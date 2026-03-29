@@ -2,6 +2,7 @@
 
 import p4py.lang as p4
 from p4py.arch import v1model
+from p4py.arch.v1model import standard_metadata_t
 
 from tests.e2e.sai_p4.fixed.metadata import MeterColor_t, headers_t, local_metadata_t
 
@@ -10,7 +11,9 @@ COPY_TO_CPU_SESSION_ID = 255
 
 @p4.control
 def acl_wbb_ingress(
-    headers: headers_t, local_metadata: local_metadata_t, standard_metadata
+    headers: p4.in_(headers_t),
+    local_metadata: p4.inout(local_metadata_t),
+    standard_metadata: p4.inout(standard_metadata_t),
 ):
     ttl = p4.bit(8)
 

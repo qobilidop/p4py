@@ -256,6 +256,55 @@ struct local_metadata_t {
     bool acl_drop;
 }
 
+control acl_wbb_ingress(in headers_t headers,
+                        inout local_metadata_t local_metadata,
+                        inout standard_metadata_t standard_metadata) {
+    bit<8> ttl = 0;
+
+    direct_counter(CounterType.packets_and_bytes) acl_wbb_ingress_counter;
+
+    direct_meter<MeterColor_t>(MeterType.bytes) acl_wbb_ingress_meter;
+
+    action acl_wbb_ingress_copy() {
+        read(local_metadata.color);
+        clone(v1model.CloneType.I2E, COPY_TO_CPU_SESSION_ID);
+        count();
+    }
+
+    action acl_wbb_ingress_trap() {
+        read(local_metadata.color);
+        clone(v1model.CloneType.I2E, COPY_TO_CPU_SESSION_ID);
+        mark_to_drop(standard_metadata);
+        count();
+    }
+
+    table acl_wbb_ingress_table {
+        key = {
+            headers.ipv4.isValid(): optional;
+            headers.ipv6.isValid(): optional;
+            headers.ethernet.ether_type: ternary;
+            ttl: ternary;
+        }
+        actions = {
+            acl_wbb_ingress_copy;
+            acl_wbb_ingress_trap;
+            NoAction;
+        }
+        meters = acl_wbb_ingress_meter;
+        counters = acl_wbb_ingress_counter;
+        size = 8;
+    }
+
+    apply {
+        if (headers.ipv4.isValid()) {
+            ttl = headers.ipv4.ttl;
+        } else if (headers.ipv6.isValid()) {
+            ttl = headers.ipv6.hop_limit;
+        }
+        acl_wbb_ingress_table.apply();
+    }
+}
+
 parser packet_parser(packet_in packet,
                 out headers_t headers,
                 inout local_metadata_t local_metadata,
