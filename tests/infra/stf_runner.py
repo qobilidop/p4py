@@ -116,7 +116,8 @@ def _strip_control_prefix(name: str) -> str:
 
 def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> None:
     """Parse an STF 'add' command into simulator table_entries format."""
-    tokens = args.split()
+    # p4testgen wraps identifiers in quotes; strip them.
+    tokens = args.replace('"', "").split()
     table = _strip_control_prefix(tokens[0])
 
     action_token = ""

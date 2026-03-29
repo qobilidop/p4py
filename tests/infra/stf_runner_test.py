@@ -1,5 +1,7 @@
 """Unit tests for the STF runner's parser and hex matcher."""
 
+import unittest
+
 from tests.infra.stf_runner import (
     match_hex,
     parse_stf_string,
@@ -7,7 +9,7 @@ from tests.infra.stf_runner import (
 )
 
 
-class TestParseStf:
+class TestParseStf(unittest.TestCase):
     def test_empty(self):
         assert parse_stf_string("") == []
 
@@ -40,7 +42,7 @@ class TestParseStf:
         assert cmds[2][0] == "expect"
 
 
-class TestMatchHex:
+class TestMatchHex(unittest.TestCase):
     def test_exact_match(self):
         assert match_hex("aabb", "aabb")
 
@@ -60,7 +62,7 @@ class TestMatchHex:
         assert not match_hex("aabb", "aabbcc")
 
 
-class TestStfToSimInputs:
+class TestStfToSimInputs(unittest.TestCase):
     def test_basic_forward(self):
         stf = (
             "add MyIngress.mac_table MyIngress.forward(port:2)"
@@ -125,8 +127,31 @@ class TestStfToSimInputs:
         assert entry["key"] == {"k1": 0xAA, "k2": 0xBB}
         assert entry["prefix_len"] == {"k2": 16}
 
+    def test_quoted_identifiers(self):
+        """p4testgen generates STF with quoted identifiers."""
+        stf = (
+            'add "MyIngress.mac_table" "hdr.ethernet.dstAddr":0x000000000001'
+            ' "MyIngress.forward"("port":0x002)\n'
+            "packet 0 000000000001000000000002 0800\n"
+            "expect 2 000000000001000000000002 0800\n"
+        )
+        result = stf_to_sim_inputs(stf)
+        assert result.table_entries == {
+            "mac_table": [
+                {
+                    "key": {"hdr.ethernet.dstAddr": 0x000000000001},
+                    "action": "forward",
+                    "args": {"port": 2},
+                },
+            ],
+        }
+
     def test_drop_test_no_expect(self):
         stf = "add T A()\npacket 0 AABB\n"
         result = stf_to_sim_inputs(stf)
         assert len(result.packets) == 1
         assert len(result.expects) == 0
+
+
+if __name__ == "__main__":
+    unittest.main()
