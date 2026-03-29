@@ -1,0 +1,6 @@
+# STF test for table_entries_exact_bmv2.p4
+# Exercises const entry: e=0x01 → a_with_control_params(1) → egress port 1.
+# Captured from P4Testgen output.
+
+packet 0 01000000000000
+expect 1 01000000000000$

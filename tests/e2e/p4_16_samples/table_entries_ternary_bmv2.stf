@@ -1,0 +1,6 @@
+# STF test for table_entries_ternary_bmv2.p4
+# Exercises const ternary entry: t=0x0001 masked 0x00FF → port 1.
+# Captured from P4Testgen output.
+
+packet 0 00000100000000
+expect 1 00000100000000$

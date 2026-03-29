@@ -1,0 +1,6 @@
+# STF test for table_entries_exact_ternary_bmv2.p4
+# Exercises const entry: e=0x01, t=0x0001 → port 1.
+# Captured from P4Testgen output.
+
+packet 0 01000100000000
+expect 1 01000100000000$

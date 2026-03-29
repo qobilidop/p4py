@@ -1,0 +1,6 @@
+# STF test for init_ebpf.p4
+# Exercises const entry: protocol=0x0800 → match(true) → accept.
+# Captured from P4Testgen output.
+
+packet 0 00000000000000000000000008000000000000000000000000
+expect 0 00000000000000000000000008000000000000000000000000

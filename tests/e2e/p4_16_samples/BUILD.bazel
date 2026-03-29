@@ -48,6 +48,13 @@ p4testgen_test(
     p4_module = "tests.e2e.p4_16_samples.init_ebpf",
 )
 
+stf_test(
+    name = "init_ebpf_stf_test",
+    p4_library = ":init_ebpf",
+    p4_module = "tests.e2e.p4_16_samples.init_ebpf",
+    stf_file = "init_ebpf.stf",
+)
+
 py_library(
     name = "table_entries_exact_bmv2",
     srcs = ["table_entries_exact_bmv2.py"],
@@ -65,6 +72,13 @@ p4testgen_test(
     name = "table_entries_exact_bmv2_p4testgen_test",
     p4_library = ":table_entries_exact_bmv2",
     p4_module = "tests.e2e.p4_16_samples.table_entries_exact_bmv2",
+)
+
+stf_test(
+    name = "table_entries_exact_bmv2_stf_test",
+    p4_library = ":table_entries_exact_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.table_entries_exact_bmv2",
+    stf_file = "table_entries_exact_bmv2.stf",
 )
 
 py_library(
@@ -86,6 +100,13 @@ p4testgen_test(
     p4_module = "tests.e2e.p4_16_samples.table_entries_lpm_bmv2",
 )
 
+stf_test(
+    name = "table_entries_lpm_bmv2_stf_test",
+    p4_library = ":table_entries_lpm_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.table_entries_lpm_bmv2",
+    stf_file = "table_entries_lpm_bmv2.stf",
+)
+
 py_library(
     name = "table_entries_ternary_bmv2",
     srcs = ["table_entries_ternary_bmv2.py"],
@@ -105,6 +126,13 @@ p4testgen_test(
     p4_module = "tests.e2e.p4_16_samples.table_entries_ternary_bmv2",
 )
 
+stf_test(
+    name = "table_entries_ternary_bmv2_stf_test",
+    p4_library = ":table_entries_ternary_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.table_entries_ternary_bmv2",
+    stf_file = "table_entries_ternary_bmv2.stf",
+)
+
 py_library(
     name = "table_entries_exact_ternary_bmv2",
     srcs = ["table_entries_exact_ternary_bmv2.py"],
@@ -122,4 +150,11 @@ p4testgen_test(
     name = "table_entries_exact_ternary_bmv2_p4testgen_test",
     p4_library = ":table_entries_exact_ternary_bmv2",
     p4_module = "tests.e2e.p4_16_samples.table_entries_exact_ternary_bmv2",
+)
+
+stf_test(
+    name = "table_entries_exact_ternary_bmv2_stf_test",
+    p4_library = ":table_entries_exact_ternary_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.table_entries_exact_ternary_bmv2",
+    stf_file = "table_entries_exact_ternary_bmv2.stf",
 )

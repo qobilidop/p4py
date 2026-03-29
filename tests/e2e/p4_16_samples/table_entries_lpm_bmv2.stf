@@ -1,0 +1,6 @@
+# STF test for table_entries_lpm_bmv2.p4
+# Exercises const LPM entry: default match → a_with_control_params(13) → port 13.
+# Captured from P4Testgen output.
+
+packet 0 00000000000000
+expect 13 00000000000000$
