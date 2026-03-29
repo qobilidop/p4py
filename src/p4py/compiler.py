@@ -254,6 +254,26 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
         return ir.Cast(type_name=type_name, expr=inner_expr)
     if isinstance(node, ast.Constant) and node.value is None:
         return ir.Wildcard()
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        return ir.UnaryOp(op="!", operand=_ast_to_expression(node.operand))
+    if isinstance(node, ast.Compare) and len(node.ops) == 1:
+        if isinstance(node.ops[0], ast.Eq):
+            op = "=="
+        elif isinstance(node.ops[0], ast.NotEq):
+            op = "!="
+        else:
+            raise ValueError(f"Unsupported comparison: {ast.dump(node.ops[0])}")
+        return ir.CompareOp(
+            op=op,
+            left=_ast_to_expression(node.left),
+            right=_ast_to_expression(node.comparators[0]),
+        )
+    if isinstance(node, ast.BoolOp):
+        op = "&&" if isinstance(node.op, ast.And) else "||"
+        result = _ast_to_expression(node.values[0])
+        for val in node.values[1:]:
+            result = ir.LogicalOp(op=op, left=result, right=_ast_to_expression(val))
+        return result
     if isinstance(node, (ast.Attribute, ast.Name)):
         return _ast_to_field_access(node)
     if isinstance(node, ast.BinOp):

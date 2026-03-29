@@ -434,6 +434,131 @@ class TestCompileConstRef(absltest.TestCase):
         self.assertEqual(ts.cases[0].value.name, "ETHERTYPE_IPV4")
 
 
+class TestCompileExpressions(absltest.TestCase):
+    def test_compile_not(self):
+        """not expr compiles to UnaryOp('!')."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            if not hdr.ipv4.isValid():
+                pass
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        ingress = _get_block(package, "ingress")
+        if_else = ingress.apply_body[0]
+        self.assertIsInstance(if_else.condition, nodes.UnaryOp)
+        self.assertEqual(if_else.condition.op, "!")
+        self.assertIsInstance(if_else.condition.operand, nodes.IsValid)
+
+    def test_compile_compare_eq(self):
+        """== compiles to CompareOp('==')."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            if hdr.ethernet.etherType == 0x0800:
+                pass
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        ingress = _get_block(package, "ingress")
+        if_else = ingress.apply_body[0]
+        self.assertIsInstance(if_else.condition, nodes.CompareOp)
+        self.assertEqual(if_else.condition.op, "==")
+        self.assertIsInstance(if_else.condition.left, nodes.FieldAccess)
+        self.assertIsInstance(if_else.condition.right, nodes.IntLiteral)
+        self.assertEqual(if_else.condition.right.value, 0x0800)
+
+    def test_compile_compare_neq(self):
+        """!= compiles to CompareOp('!=')."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            if hdr.ethernet.etherType != 0x0800:
+                pass
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        ingress = _get_block(package, "ingress")
+        if_else = ingress.apply_body[0]
+        self.assertIsInstance(if_else.condition, nodes.CompareOp)
+        self.assertEqual(if_else.condition.op, "!=")
+
+    def test_compile_logical_and(self):
+        """and compiles to LogicalOp('&&')."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            if hdr.ipv4.isValid() and hdr.ethernet.isValid():
+                pass
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        ingress = _get_block(package, "ingress")
+        if_else = ingress.apply_body[0]
+        self.assertIsInstance(if_else.condition, nodes.LogicalOp)
+        self.assertEqual(if_else.condition.op, "&&")
+        self.assertIsInstance(if_else.condition.left, nodes.IsValid)
+        self.assertIsInstance(if_else.condition.right, nodes.IsValid)
+
+    def test_compile_logical_or(self):
+        """or compiles to LogicalOp('||')."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            if hdr.ipv4.isValid() or hdr.ethernet.isValid():
+                pass
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        ingress = _get_block(package, "ingress")
+        if_else = ingress.apply_body[0]
+        self.assertIsInstance(if_else.condition, nodes.LogicalOp)
+        self.assertEqual(if_else.condition.op, "||")
+
+    def test_compile_chained_and(self):
+        """a and b and c folds to nested LogicalOp."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            if hdr.ipv4.isValid() and hdr.ethernet.isValid() and hdr.ipv4.ttl == 64:
+                pass
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        ingress = _get_block(package, "ingress")
+        if_else = ingress.apply_body[0]
+        # (a && b) && c
+        self.assertIsInstance(if_else.condition, nodes.LogicalOp)
+        self.assertEqual(if_else.condition.op, "&&")
+        self.assertIsInstance(if_else.condition.left, nodes.LogicalOp)
+        self.assertIsInstance(if_else.condition.right, nodes.CompareOp)
+
+
 class TestCompileEbpf(absltest.TestCase):
     def test_compile_init_ebpf(self):
         """Compile a minimal eBPF program to IR."""
