@@ -25,18 +25,17 @@ def emit(package: nodes.Package) -> str:
 
     struct_names = _derive_struct_names(package)
 
-    for entry in package.blocks:
-        sig = arch.block_signature(entry.name, struct_names)
-        if entry.kind == "parser":
-            _emit_parser_block(lines, entry.decl, sig)
-        elif entry.kind == "deparser":
-            _emit_deparser_block(lines, entry.decl, sig)
-        elif entry.kind == "control":
-            _emit_control_block(lines, entry.decl, sig)
-
-    # Boilerplate for missing optional blocks.
     for spec in arch.pipeline:
-        if not any(b.name == spec.name for b in package.blocks):
+        entry = next((b for b in package.blocks if b.name == spec.name), None)
+        if entry is not None:
+            sig = arch.block_signature(entry.name, struct_names)
+            if entry.kind == "parser":
+                _emit_parser_block(lines, entry.decl, sig)
+            elif entry.kind == "deparser":
+                _emit_deparser_block(lines, entry.decl, sig)
+            elif entry.kind == "control":
+                _emit_control_block(lines, entry.decl, sig)
+        else:
             arch.emit_boilerplate(lines, spec, struct_names)
 
     block_names = {}
@@ -213,7 +212,12 @@ def _emit_block_statement(lines: list[str], stmt: nodes.Statement, indent: int) 
             lines.append(f"{pad}    }}")
         lines.append(f"{pad}}}")
     else:
-        lines.append(f"{pad}{_emit_statement(stmt)}")
+        text = _emit_statement(stmt)
+        if "\n" in text:
+            for line in text.split("\n"):
+                lines.append(f"{pad}{line}")
+        else:
+            lines.append(f"{pad}{text}")
 
 
 def _emit_statement(stmt: nodes.Statement) -> str:
@@ -224,6 +228,8 @@ def _emit_statement(stmt: nodes.Statement) -> str:
         args = ", ".join(_emit_expression(a) for a in stmt.args)
         return f"{_emit_field_access(stmt.object)}.{stmt.method}({args});"
     if isinstance(stmt, nodes.FunctionCall):
+        if any(isinstance(a, nodes.ListExpression) for a in stmt.args):
+            return _emit_multiline_function_call(stmt)
         args = ", ".join(_emit_expression(a) for a in stmt.args)
         return f"{stmt.name}({args});"
     if isinstance(stmt, nodes.ActionCall):
@@ -232,6 +238,15 @@ def _emit_statement(stmt: nodes.Statement) -> str:
     if isinstance(stmt, nodes.TableApply):
         return f"{stmt.table_name}.apply();"
     raise ValueError(f"Cannot emit statement: {stmt}")
+
+
+def _emit_multiline_function_call(stmt: nodes.FunctionCall) -> str:
+    """Emit a function call with one arg per line (for checksum-style calls)."""
+    parts = [f"{stmt.name}("]
+    for i, arg in enumerate(stmt.args):
+        suffix = "," if i < len(stmt.args) - 1 else ");"
+        parts.append(f"    {_emit_expression(arg)}{suffix}")
+    return "\n".join(parts)
 
 
 def _emit_expression(expr: nodes.Expression) -> str:

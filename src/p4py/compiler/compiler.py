@@ -228,8 +228,18 @@ def _ast_call_to_statement(call: ast.Call, params: set[str]) -> nodes.Statement:
         # block parameter (e.g. v1model.mark_to_drop).  Strip the module
         # prefix and emit a plain FunctionCall.
         if isinstance(attr.value, ast.Name) and attr.value.id not in params:
+            module_name = attr.value.id
             if call.keywords:
-                args = tuple(_ast_to_expression(kw.value) for kw in call.keywords)
+                args = []
+                for kw in call.keywords:
+                    expr = _ast_to_expression(kw.value)
+                    if (
+                        isinstance(expr, nodes.FieldAccess)
+                        and expr.path[0] == module_name
+                    ):
+                        expr = nodes.FieldAccess(path=expr.path[1:])
+                    args.append(expr)
+                args = tuple(args)
             else:
                 args = tuple(_ast_to_expression(a) for a in call.args)
             return nodes.FunctionCall(name=attr.attr, args=args)

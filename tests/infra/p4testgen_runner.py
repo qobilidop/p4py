@@ -14,9 +14,9 @@ import subprocess
 import sys
 import tempfile
 
+from p4py.arch.ebpf_model import EbpfFilterArch
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
-from p4py.ir.nodes import EbpfProgram
 from p4py.sim import simulate
 from tests.infra.stf_runner import match_hex, stf_to_sim_inputs
 
@@ -78,7 +78,7 @@ def run_p4testgen_test(module_path: str, p4testgen_path: str) -> bool:
     p4_source = emit(program)
 
     # Detect target/arch from program type.
-    if isinstance(program, EbpfProgram):
+    if isinstance(program.arch, EbpfFilterArch):
         target, arch = "ebpf", "ebpf"
     else:
         target, arch = "bmv2", "v1model"
