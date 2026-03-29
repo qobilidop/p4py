@@ -294,3 +294,44 @@ class _Sentinel:
 
 action = _Sentinel("decorator", "action")
 table = _Sentinel("builtin", "table")
+
+
+# --- Parameter directions ---
+
+
+class _Direction:
+    """A parameter direction wrapper."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def __call__(self, type_ref):
+        """Wrap a type with a direction: p4.in_(headers_t)."""
+        return _DirectedType(self._name, type_ref)
+
+    def __repr__(self) -> str:
+        return self._name
+
+
+class _DirectedType:
+    """A type with a direction annotation."""
+
+    def __init__(self, direction: str, type_ref) -> None:
+        self.direction = direction
+        self.type_ref = type_ref
+        # Delegate _p4_name to the underlying type.
+        if hasattr(type_ref, "_p4_name"):
+            self._p4_name = type_ref._p4_name
+
+
+in_ = _Direction("in")
+out_ = _Direction("out")
+out = out_
+inout_ = _Direction("inout")
+inout = inout_
+
+
+def __getattr__(name):
+    if name == "in":
+        return in_
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
