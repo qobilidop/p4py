@@ -222,18 +222,19 @@ class TestDeparser(absltest.TestCase):
         self.assertLen(d.emit_order, 2)
 
 
-class TestProgram(absltest.TestCase):
-    def test_program(self):
-        prog = nodes.Program(
+class TestPackage(absltest.TestCase):
+    def test_package_creation(self):
+        parser = nodes.ParserDecl(name="prs", states=())
+        entry = nodes.BlockEntry(name="parser", kind="parser", decl=parser)
+        pkg = nodes.Package(
+            arch=None,
             headers=(),
             structs=(),
-            parser=nodes.ParserDecl(name="P", states=()),
-            ingress=nodes.ControlDecl(name="I", actions=(), tables=(), apply_body=()),
-            deparser=nodes.DeparserDecl(name="D", emit_order=()),
+            blocks=(entry,),
         )
-        self.assertEqual(prog.parser.name, "P")
-        self.assertEqual(prog.ingress.name, "I")
-        self.assertEqual(prog.deparser.name, "D")
+        self.assertLen(pkg.blocks, 1)
+        self.assertEqual(pkg.blocks[0].name, "parser")
+        self.assertEqual(pkg.blocks[0].decl.name, "prs")
 
 
 class TestBoolType(absltest.TestCase):
@@ -254,18 +255,22 @@ class TestConstEntry(absltest.TestCase):
         self.assertEqual(len(entry.values), 1)
 
 
-class TestEbpfProgram(absltest.TestCase):
-    def test_creation(self):
-        prog = nodes.EbpfProgram(
-            headers=(),
-            structs=(),
-            parser=nodes.ParserDecl(name="prs", states=()),
-            filter=nodes.ControlDecl(
-                name="pipe", actions=(), tables=(), apply_body=()
-            ),
-        )
-        self.assertEqual(prog.parser.name, "prs")
-        self.assertEqual(prog.filter.name, "pipe")
+class TestBlockEntry(absltest.TestCase):
+    def test_block_entry(self):
+        parser = nodes.ParserDecl(name="prs", states=())
+        entry = nodes.BlockEntry(name="parser", kind="parser", decl=parser)
+        self.assertEqual(entry.name, "parser")
+        self.assertEqual(entry.kind, "parser")
+        self.assertEqual(entry.decl.name, "prs")
+
+
+class TestListExpression(absltest.TestCase):
+    def test_list_expression(self):
+        le = nodes.ListExpression(elements=(
+            nodes.FieldAccess(path=("hdr", "ipv4", "version")),
+            nodes.FieldAccess(path=("hdr", "ipv4", "ihl")),
+        ))
+        self.assertLen(le.elements, 2)
 
 
 class TestNodesFrozen(absltest.TestCase):

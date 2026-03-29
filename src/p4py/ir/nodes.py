@@ -77,7 +77,12 @@ class IsValid:
     header_ref: FieldAccess
 
 
-Expression = FieldAccess | IntLiteral | BoolLiteral | ArithOp | IsValid
+@dataclass(frozen=True)
+class ListExpression:
+    elements: tuple[Expression, ...]
+
+
+Expression = FieldAccess | IntLiteral | BoolLiteral | ArithOp | IsValid | ListExpression
 
 
 # --- Statements ---
@@ -139,22 +144,6 @@ class ConstEntry:
     action_args: tuple[Expression, ...]
 
 
-@dataclass(frozen=True)
-class ChecksumVerify:
-    condition: Expression
-    data: tuple[FieldAccess, ...]
-    checksum: FieldAccess
-    algo: str
-
-
-@dataclass(frozen=True)
-class ChecksumUpdate:
-    condition: Expression
-    data: tuple[FieldAccess, ...]
-    checksum: FieldAccess
-    algo: str
-
-
 Statement = (
     Assignment
     | MethodCall
@@ -163,8 +152,6 @@ Statement = (
     | TableApply
     | IfElse
     | SwitchAction
-    | ChecksumVerify
-    | ChecksumUpdate
 )
 
 
@@ -255,24 +242,19 @@ class DeparserDecl:
     emit_order: tuple[FieldAccess, ...]
 
 
-# --- Program ---
+# --- Package ---
 
 
 @dataclass(frozen=True)
-class Program:
-    headers: tuple[HeaderType, ...]
-    structs: tuple[StructType, ...]
-    parser: ParserDecl
-    ingress: ControlDecl
-    deparser: DeparserDecl
-    egress: ControlDecl | None = None
-    verify_checksum: ControlDecl | None = None
-    compute_checksum: ControlDecl | None = None
+class BlockEntry:
+    name: str
+    kind: str  # "parser", "control", "deparser"
+    decl: ParserDecl | ControlDecl | DeparserDecl
 
 
 @dataclass(frozen=True)
-class EbpfProgram:
+class Package:
+    arch: object  # Architecture instance (typed as object to avoid circular import)
     headers: tuple[HeaderType, ...]
     structs: tuple[StructType, ...]
-    parser: ParserDecl
-    filter: ControlDecl
+    blocks: tuple[BlockEntry, ...]
