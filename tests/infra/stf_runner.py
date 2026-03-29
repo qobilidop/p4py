@@ -163,5 +163,3 @@ def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> No
     if prefix_len_dict:
         entry["prefix_len"] = prefix_len_dict
     table_entries.setdefault(table, []).append(entry)
-
-

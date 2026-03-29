@@ -4,6 +4,8 @@ Writes the test program from the P4Mini spec using the full DSL, compiles to IR,
 emits P4-16 source, and simulates packet processing.
 """
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.backend.p4 import emit
@@ -119,19 +121,19 @@ TABLE_ENTRIES = {
 # --- Tests ---
 
 
-class TestIntegration:
+class TestIntegration(absltest.TestCase):
     def test_compile_and_emit(self):
         """Compile to IR and emit valid P4-16 source."""
         program = compile(main)
         source = emit(program)
 
         # Should be parseable P4 — check key structure.
-        assert "header ethernet_t {" in source
-        assert "header ipv4_t {" in source
-        assert "parser MyParser(" in source
-        assert "control MyIngress(" in source
-        assert "V1Switch(" in source
-        assert ") main;" in source
+        self.assertIn("header ethernet_t {", source)
+        self.assertIn("header ipv4_t {", source)
+        self.assertIn("parser MyParser(", source)
+        self.assertIn("control MyIngress(", source)
+        self.assertIn("V1Switch(", source)
+        self.assertIn(") main;", source)
 
     def test_simulate_forward(self):
         """IPv4 packet matching a table entry is forwarded."""
@@ -142,10 +144,10 @@ class TestIntegration:
             ingress_port=1,
             table_entries=TABLE_ENTRIES,
         )
-        assert not result.dropped
-        assert result.egress_port == 2
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 2)
         # TTL decremented from 64 (0x40) to 63 (0x3f).
-        assert result.packet[22] == 63
+        self.assertEqual(result.packet[22], 63)
 
     def test_simulate_drop_no_entry(self):
         """IPv4 packet with no matching entry is dropped."""
@@ -156,7 +158,7 @@ class TestIntegration:
             ingress_port=1,
             table_entries={},
         )
-        assert result.dropped
+        self.assertTrue(result.dropped)
 
     def test_simulate_drop_non_ipv4(self):
         """Non-IPv4 packet is dropped (isValid check fails)."""
@@ -167,4 +169,8 @@ class TestIntegration:
             ingress_port=1,
             table_entries=TABLE_ENTRIES,
         )
-        assert result.dropped
+        self.assertTrue(result.dropped)
+
+
+if __name__ == "__main__":
+    absltest.main()

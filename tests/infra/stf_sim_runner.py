@@ -49,9 +49,7 @@ def run_stf_sim_test(module_path: str, stf_path: str) -> bool:
             continue
 
         if result.egress_port != expect.port:
-            print(
-                f"FAIL: expected port {expect.port}, got {result.egress_port}"
-            )
+            print(f"FAIL: expected port {expect.port}, got {result.egress_port}")
             passed = False
             continue
 

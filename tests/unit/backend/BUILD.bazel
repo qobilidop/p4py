@@ -3,17 +3,26 @@ load("@rules_python//python:defs.bzl", "py_test")
 py_test(
     name = "test_p4",
     srcs = ["test_p4.py"],
-    deps = ["//src/p4py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
 )
 
 py_test(
     name = "test_egress_emit",
     srcs = ["test_egress_emit.py"],
-    deps = ["//src/p4py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
 )
 
 py_test(
     name = "test_checksum_emit",
     srcs = ["test_checksum_emit.py"],
-    deps = ["//src/p4py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
 )

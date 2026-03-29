@@ -126,8 +126,7 @@ def run_p4testgen_test(module_path: str, p4testgen_path: str) -> bool:
                 for egress_port, pkt_hex in sim_results:
                     if egress_port != -1:
                         print(
-                            f"FAIL {test_name}: expected drop,"
-                            f" got port {egress_port}"
+                            f"FAIL {test_name}: expected drop, got port {egress_port}"
                         )
                         passed = False
 

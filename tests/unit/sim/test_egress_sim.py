@@ -1,5 +1,7 @@
 """Test that the simulator executes egress control blocks."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.compiler import compile
@@ -78,8 +80,8 @@ main = v1model.V1Switch(
 )
 
 
-class TestEgressSim:
-    def setup_method(self):
+class TestEgressSim(absltest.TestCase):
+    def setUp(self):
         self.program = compile(main)
 
     def test_egress_rewrites_packet(self):
@@ -108,10 +110,10 @@ class TestEgressSim:
         result = simulate(
             self.program, packet=packet, ingress_port=0, table_entries=entries
         )
-        assert not result.dropped
-        assert result.egress_port == 5
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 5)
         # srcAddr rewritten by egress from 00:00:00:00:00:02 to AA:BB:CC:DD:EE:FF
-        assert result.packet[6:12] == b"\xaa\xbb\xcc\xdd\xee\xff"
+        self.assertEqual(result.packet[6:12], b"\xaa\xbb\xcc\xdd\xee\xff")
 
     def test_egress_skipped_on_drop(self):
         """Egress does not run when ingress drops the packet."""
@@ -133,7 +135,7 @@ class TestEgressSim:
             self.program, packet=packet, ingress_port=0, table_entries=entries
         )
         # No fwd_table match -> egress_spec stays 0 -> not dropped, just port 0
-        assert result.egress_port == 0
+        self.assertEqual(result.egress_port, 0)
 
     def test_no_egress_pipeline_still_works(self):
         """Pipeline without egress works as before."""
@@ -154,5 +156,9 @@ class TestEgressSim:
             ],
         }
         result = simulate(program, packet=packet, ingress_port=0, table_entries=entries)
-        assert not result.dropped
-        assert result.egress_port == 5
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 5)
+
+
+if __name__ == "__main__":
+    absltest.main()

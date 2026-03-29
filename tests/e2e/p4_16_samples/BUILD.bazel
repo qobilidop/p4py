@@ -11,20 +11,20 @@ py_library(
 
 golden_test(
     name = "basic_routing_bmv2_golden_test",
-    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
-    p4_library = ":basic_routing_bmv2",
     golden_file = "basic_routing_bmv2.p4",
+    p4_library = ":basic_routing_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
 )
 
 stf_test(
     name = "basic_routing_bmv2_stf_test",
-    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
     p4_library = ":basic_routing_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
     stf_file = "basic_routing_bmv2.stf",
 )
 
 p4testgen_test(
     name = "basic_routing_bmv2_p4testgen_test",
-    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
     p4_library = ":basic_routing_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
 )

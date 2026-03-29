@@ -1,5 +1,7 @@
 """Tests for the P4-16 backend."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.backend.p4 import emit
@@ -36,7 +38,7 @@ class metadata_t(p4.struct):
     pass
 
 
-class TestEmit:
+class TestEmit(absltest.TestCase):
     def test_ipv4_forwarder(self):
         @p4.parser
         def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
@@ -88,48 +90,52 @@ class TestEmit:
         source = emit(program)
 
         # Verify key fragments are present in the emitted P4.
-        assert "#include <core.p4>" in source
-        assert "#include <v1model.p4>" in source
+        self.assertIn("#include <core.p4>", source)
+        self.assertIn("#include <v1model.p4>", source)
 
-        assert "header ethernet_t {" in source
-        assert "bit<48> dstAddr;" in source
-        assert "header ipv4_t {" in source
+        self.assertIn("header ethernet_t {", source)
+        self.assertIn("bit<48> dstAddr;", source)
+        self.assertIn("header ipv4_t {", source)
 
-        assert "struct headers_t {" in source
-        assert "ethernet_t ethernet;" in source
-        assert "struct metadata_t {" in source
+        self.assertIn("struct headers_t {", source)
+        self.assertIn("ethernet_t ethernet;", source)
+        self.assertIn("struct metadata_t {", source)
 
-        assert "parser MyParser(" in source
-        assert "state start {" in source
-        assert "pkt.extract(hdr.ethernet);" in source
-        assert "transition select(hdr.ethernet.etherType)" in source
-        assert "0x0800: parse_ipv4;" in source
-        assert "default: accept;" in source
-        assert "state parse_ipv4 {" in source
+        self.assertIn("parser MyParser(", source)
+        self.assertIn("state start {", source)
+        self.assertIn("pkt.extract(hdr.ethernet);", source)
+        self.assertIn("transition select(hdr.ethernet.etherType)", source)
+        self.assertIn("0x0800: parse_ipv4;", source)
+        self.assertIn("default: accept;", source)
+        self.assertIn("state parse_ipv4 {", source)
 
-        assert "control MyIngress(" in source
-        assert "action forward(bit<9> port)" in source
-        assert "std_meta.egress_spec = port;" in source
-        assert "hdr.ipv4.ttl = hdr.ipv4.ttl - 1;" in source
-        assert "action drop()" in source
-        assert "mark_to_drop(std_meta);" in source
+        self.assertIn("control MyIngress(", source)
+        self.assertIn("action forward(bit<9> port)", source)
+        self.assertIn("std_meta.egress_spec = port;", source)
+        self.assertIn("hdr.ipv4.ttl = hdr.ipv4.ttl - 1;", source)
+        self.assertIn("action drop()", source)
+        self.assertIn("mark_to_drop(std_meta);", source)
 
-        assert "table ipv4_table {" in source
-        assert "hdr.ipv4.dstAddr: exact;" in source
-        assert "actions = {" in source
-        assert "default_action = drop();" in source
+        self.assertIn("table ipv4_table {", source)
+        self.assertIn("hdr.ipv4.dstAddr: exact;", source)
+        self.assertIn("actions = {", source)
+        self.assertIn("default_action = drop();", source)
 
-        assert "if (hdr.ipv4.isValid())" in source
-        assert "ipv4_table.apply();" in source
-        assert "} else {" in source
+        self.assertIn("if (hdr.ipv4.isValid())", source)
+        self.assertIn("ipv4_table.apply();", source)
+        self.assertIn("} else {", source)
 
-        assert "control MyDeparser(" in source
-        assert "pkt.emit(hdr.ethernet);" in source
-        assert "pkt.emit(hdr.ipv4);" in source
+        self.assertIn("control MyDeparser(", source)
+        self.assertIn("pkt.emit(hdr.ethernet);", source)
+        self.assertIn("pkt.emit(hdr.ipv4);", source)
 
         # Boilerplate blocks
-        assert "control MyVerifyChecksum(" in source
-        assert "control MyEgress(" in source
-        assert "control MyComputeChecksum(" in source
-        assert "V1Switch(" in source
-        assert ") main;" in source
+        self.assertIn("control MyVerifyChecksum(", source)
+        self.assertIn("control MyEgress(", source)
+        self.assertIn("control MyComputeChecksum(", source)
+        self.assertIn("V1Switch(", source)
+        self.assertIn(") main;", source)
+
+
+if __name__ == "__main__":
+    absltest.main()

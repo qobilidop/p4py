@@ -1,5 +1,7 @@
 """Test that std_meta fields can be used as table keys."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.compiler import compile
@@ -58,7 +60,7 @@ main = v1model.V1Switch(
 )
 
 
-class TestStdMetaTableKey:
+class TestStdMetaTableKey(absltest.TestCase):
     def test_exact_match_on_ingress_port(self):
         """Table with std_meta.ingress_port as exact key routes correctly."""
         program = compile(main)
@@ -73,7 +75,7 @@ class TestStdMetaTableKey:
             ],
         }
         result = simulate(program, packet=packet, ingress_port=3, table_entries=entries)
-        assert result.egress_port == 7
+        self.assertEqual(result.egress_port, 7)
 
     def test_no_match_uses_default(self):
         """When ingress_port doesn't match any entry, default action runs."""
@@ -89,4 +91,8 @@ class TestStdMetaTableKey:
             ],
         }
         result = simulate(program, packet=packet, ingress_port=5, table_entries=entries)
-        assert result.egress_port == 0  # default nop, egress_spec stays 0
+        self.assertEqual(result.egress_port, 0)  # default nop, egress_spec stays 0
+
+
+if __name__ == "__main__":
+    absltest.main()

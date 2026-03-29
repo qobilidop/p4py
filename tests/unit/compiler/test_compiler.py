@@ -1,5 +1,7 @@
 """Tests for the P4Mini compiler."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.compiler import compile
@@ -62,7 +64,7 @@ def _dummy_deparser():
     return D
 
 
-class TestCompileParser:
+class TestCompileParser(absltest.TestCase):
     def test_simple_parser_with_transition(self):
         @p4.parser
         def MyParser(pkt, hdr: headers_t, meta: metadata_t, std_meta):
@@ -78,16 +80,16 @@ class TestCompileParser:
         program = compile(pipeline)
 
         parser_ir = program.parser
-        assert parser_ir.name == "MyParser"
-        assert len(parser_ir.states) == 1
+        self.assertEqual(parser_ir.name, "MyParser")
+        self.assertLen(parser_ir.states, 1)
 
         start = parser_ir.states[0]
-        assert start.name == "start"
-        assert len(start.body) == 1
-        assert isinstance(start.body[0], nodes.MethodCall)
-        assert start.body[0].method == "extract"
-        assert isinstance(start.transition, nodes.Transition)
-        assert start.transition.next_state == "accept"
+        self.assertEqual(start.name, "start")
+        self.assertLen(start.body, 1)
+        self.assertIsInstance(start.body[0], nodes.MethodCall)
+        self.assertEqual(start.body[0].method, "extract")
+        self.assertIsInstance(start.transition, nodes.Transition)
+        self.assertEqual(start.transition.next_state, "accept")
 
     def test_parser_with_transition_select(self):
         @p4.parser
@@ -112,27 +114,30 @@ class TestCompileParser:
         program = compile(pipeline)
 
         parser_ir = program.parser
-        assert len(parser_ir.states) == 2
+        self.assertLen(parser_ir.states, 2)
 
         start = parser_ir.states[0]
-        assert isinstance(start.transition, nodes.TransitionSelect)
-        assert start.transition.field == nodes.FieldAccess(
-            path=("hdr", "ethernet", "etherType")
+        self.assertIsInstance(start.transition, nodes.TransitionSelect)
+        self.assertEqual(
+            start.transition.field,
+            nodes.FieldAccess(path=("hdr", "ethernet", "etherType")),
         )
-        assert len(start.transition.cases) == 2
-        assert start.transition.cases[0] == nodes.SelectCase(
-            value=0x0800, next_state="parse_ipv4"
+        self.assertLen(start.transition.cases, 2)
+        self.assertEqual(
+            start.transition.cases[0],
+            nodes.SelectCase(value=0x0800, next_state="parse_ipv4"),
         )
-        assert start.transition.cases[1] == nodes.SelectCase(
-            value=None, next_state="accept"
+        self.assertEqual(
+            start.transition.cases[1],
+            nodes.SelectCase(value=None, next_state="accept"),
         )
 
         parse_ipv4 = parser_ir.states[1]
-        assert parse_ipv4.name == "parse_ipv4"
-        assert isinstance(parse_ipv4.transition, nodes.Transition)
+        self.assertEqual(parse_ipv4.name, "parse_ipv4")
+        self.assertIsInstance(parse_ipv4.transition, nodes.Transition)
 
 
-class TestCompileControl:
+class TestCompileControl(absltest.TestCase):
     def test_action_with_params(self):
         @p4.control
         def MyIngress(hdr, meta, std_meta):
@@ -163,40 +168,44 @@ class TestCompileControl:
         program = compile(pipeline)
 
         ingress = program.ingress
-        assert ingress.name == "MyIngress"
+        self.assertEqual(ingress.name, "MyIngress")
 
         # Actions
-        assert len(ingress.actions) == 2
+        self.assertLen(ingress.actions, 2)
         fwd = ingress.actions[0]
-        assert fwd.name == "forward"
-        assert len(fwd.params) == 1
-        assert fwd.params[0] == nodes.ActionParam("port", nodes.BitType(9))
-        assert len(fwd.body) == 1
-        assert isinstance(fwd.body[0], nodes.Assignment)
+        self.assertEqual(fwd.name, "forward")
+        self.assertLen(fwd.params, 1)
+        self.assertEqual(fwd.params[0], nodes.ActionParam("port", nodes.BitType(9)))
+        self.assertLen(fwd.body, 1)
+        self.assertIsInstance(fwd.body[0], nodes.Assignment)
 
         drop_action = ingress.actions[1]
-        assert drop_action.name == "drop"
-        assert len(drop_action.params) == 0
-        assert isinstance(drop_action.body[0], nodes.FunctionCall)
-        assert drop_action.body[0].name == "mark_to_drop"
+        self.assertEqual(drop_action.name, "drop")
+        self.assertLen(drop_action.params, 0)
+        self.assertIsInstance(drop_action.body[0], nodes.FunctionCall)
+        self.assertEqual(drop_action.body[0].name, "mark_to_drop")
 
         # Table
-        assert len(ingress.tables) == 1
+        self.assertLen(ingress.tables, 1)
         tbl = ingress.tables[0]
-        assert tbl.name == "ipv4_table"
-        assert tbl.keys[0].match_kind == "exact"
-        assert tbl.keys[0].field == nodes.FieldAccess(path=("hdr", "ipv4", "dstAddr"))
-        assert tbl.actions == ("forward", "drop")
-        assert tbl.default_action == "drop"
+        self.assertEqual(tbl.name, "ipv4_table")
+        self.assertEqual(tbl.keys[0].match_kind, "exact")
+        self.assertEqual(
+            tbl.keys[0].field, nodes.FieldAccess(path=("hdr", "ipv4", "dstAddr"))
+        )
+        self.assertEqual(tbl.actions, ("forward", "drop"))
+        self.assertEqual(tbl.default_action, "drop")
 
         # Apply body
-        assert len(ingress.apply_body) == 1
+        self.assertLen(ingress.apply_body, 1)
         if_else = ingress.apply_body[0]
-        assert isinstance(if_else, nodes.IfElse)
-        assert isinstance(if_else.condition, nodes.IsValid)
-        assert if_else.condition.header_ref == nodes.FieldAccess(path=("hdr", "ipv4"))
-        assert isinstance(if_else.then_body[0], nodes.TableApply)
-        assert isinstance(if_else.else_body[0], nodes.FunctionCall)
+        self.assertIsInstance(if_else, nodes.IfElse)
+        self.assertIsInstance(if_else.condition, nodes.IsValid)
+        self.assertEqual(
+            if_else.condition.header_ref, nodes.FieldAccess(path=("hdr", "ipv4"))
+        )
+        self.assertIsInstance(if_else.then_body[0], nodes.TableApply)
+        self.assertIsInstance(if_else.else_body[0], nodes.FunctionCall)
 
     def test_module_qualified_extern(self):
         """v1model.mark_to_drop(std_meta) compiles to FunctionCall."""
@@ -218,11 +227,11 @@ class TestCompileControl:
         program = compile(pipeline)
 
         drop_action = program.ingress.actions[0]
-        assert isinstance(drop_action.body[0], nodes.FunctionCall)
-        assert drop_action.body[0].name == "mark_to_drop"
+        self.assertIsInstance(drop_action.body[0], nodes.FunctionCall)
+        self.assertEqual(drop_action.body[0].name, "mark_to_drop")
 
 
-class TestCompileDeparser:
+class TestCompileDeparser(absltest.TestCase):
     def test_emit_order(self):
         @p4.deparser
         def MyDeparser(pkt, hdr):
@@ -237,13 +246,13 @@ class TestCompileDeparser:
         program = compile(pipeline)
 
         dep = program.deparser
-        assert dep.name == "MyDeparser"
-        assert len(dep.emit_order) == 2
-        assert dep.emit_order[0] == nodes.FieldAccess(path=("hdr", "ethernet"))
-        assert dep.emit_order[1] == nodes.FieldAccess(path=("hdr", "ipv4"))
+        self.assertEqual(dep.name, "MyDeparser")
+        self.assertLen(dep.emit_order, 2)
+        self.assertEqual(dep.emit_order[0], nodes.FieldAccess(path=("hdr", "ethernet")))
+        self.assertEqual(dep.emit_order[1], nodes.FieldAccess(path=("hdr", "ipv4")))
 
 
-class TestCompileProgram:
+class TestCompileProgram(absltest.TestCase):
     def test_full_program_types(self):
         @p4.parser
         def P(pkt, hdr: headers_t, meta: metadata_t, std_meta):
@@ -266,18 +275,23 @@ class TestCompileProgram:
         program = compile(pipeline)
 
         # Headers extracted from struct
-        assert len(program.headers) == 2
-        assert program.headers[0].name == "ethernet_t"
-        assert program.headers[1].name == "ipv4_t"
-        assert len(program.headers[0].fields) == 3
-        assert program.headers[0].fields[0] == nodes.HeaderField(
-            "dstAddr", nodes.BitType(48)
+        self.assertLen(program.headers, 2)
+        self.assertEqual(program.headers[0].name, "ethernet_t")
+        self.assertEqual(program.headers[1].name, "ipv4_t")
+        self.assertLen(program.headers[0].fields, 3)
+        self.assertEqual(
+            program.headers[0].fields[0],
+            nodes.HeaderField("dstAddr", nodes.BitType(48)),
         )
 
         # Structs
-        assert len(program.structs) == 2
-        assert program.structs[0].name == "headers_t"
-        assert program.structs[1].name == "metadata_t"
-        assert program.structs[0].members[0] == nodes.StructMember(
-            "ethernet", "ethernet_t"
+        self.assertLen(program.structs, 2)
+        self.assertEqual(program.structs[0].name, "headers_t")
+        self.assertEqual(program.structs[1].name, "metadata_t")
+        self.assertEqual(
+            program.structs[0].members[0], nodes.StructMember("ethernet", "ethernet_t")
         )
+
+
+if __name__ == "__main__":
+    absltest.main()

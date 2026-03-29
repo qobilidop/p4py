@@ -1,5 +1,7 @@
 """Test that checksum controls are compiled to IR."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.compiler import compile
@@ -107,7 +109,7 @@ def TestDeparser(pkt, hdr):
     pkt.emit(hdr.ethernet)
 
 
-class TestChecksumCompile:
+class TestChecksumCompile(absltest.TestCase):
     def test_verify_checksum_compiled(self):
         """verify_checksum control produces ChecksumVerify IR node."""
         main = v1model.V1Switch(
@@ -118,16 +120,20 @@ class TestChecksumCompile:
             deparser=TestDeparser,
         )
         program = compile(main)
-        assert program.verify_checksum is not None
-        assert program.verify_checksum.name == "TestVerifyChecksum"
-        assert len(program.verify_checksum.apply_body) == 1
+        self.assertIsNotNone(program.verify_checksum)
+        self.assertEqual(program.verify_checksum.name, "TestVerifyChecksum")
+        self.assertLen(program.verify_checksum.apply_body, 1)
         stmt = program.verify_checksum.apply_body[0]
-        assert isinstance(stmt, nodes.ChecksumVerify)
-        assert isinstance(stmt.condition, nodes.IsValid)
-        assert len(stmt.data) == 11
-        assert stmt.data[0] == nodes.FieldAccess(path=("hdr", "ipv4", "version"))
-        assert stmt.checksum == nodes.FieldAccess(path=("hdr", "ipv4", "hdrChecksum"))
-        assert stmt.algo == "csum16"
+        self.assertIsInstance(stmt, nodes.ChecksumVerify)
+        self.assertIsInstance(stmt.condition, nodes.IsValid)
+        self.assertLen(stmt.data, 11)
+        self.assertEqual(
+            stmt.data[0], nodes.FieldAccess(path=("hdr", "ipv4", "version"))
+        )
+        self.assertEqual(
+            stmt.checksum, nodes.FieldAccess(path=("hdr", "ipv4", "hdrChecksum"))
+        )
+        self.assertEqual(stmt.algo, "csum16")
 
     def test_compute_checksum_compiled(self):
         """update_checksum control produces ChecksumUpdate IR node."""
@@ -139,10 +145,10 @@ class TestChecksumCompile:
             deparser=TestDeparser,
         )
         program = compile(main)
-        assert program.compute_checksum is not None
+        self.assertIsNotNone(program.compute_checksum)
         stmt = program.compute_checksum.apply_body[0]
-        assert isinstance(stmt, nodes.ChecksumUpdate)
-        assert stmt.algo == "csum16"
+        self.assertIsInstance(stmt, nodes.ChecksumUpdate)
+        self.assertEqual(stmt.algo, "csum16")
 
     def test_no_checksum_produces_none(self):
         """Pipeline without checksum controls produces None."""
@@ -152,5 +158,9 @@ class TestChecksumCompile:
             deparser=TestDeparser,
         )
         program = compile(main)
-        assert program.verify_checksum is None
-        assert program.compute_checksum is None
+        self.assertIsNone(program.verify_checksum)
+        self.assertIsNone(program.compute_checksum)
+
+
+if __name__ == "__main__":
+    absltest.main()

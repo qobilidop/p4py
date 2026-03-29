@@ -1,5 +1,7 @@
 """Tests for the P4Mini simulator."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.compiler import compile
@@ -151,7 +153,7 @@ IPV4_HDR = (
 TEST_PACKET = ETHERNET_HDR + IPV4_HDR
 
 
-class TestSimulator:
+class TestSimulator(absltest.TestCase):
     def test_forward_packet(self):
         program = _make_ipv4_forwarder()
         table_entries = {
@@ -169,10 +171,10 @@ class TestSimulator:
             ingress_port=1,
             table_entries=table_entries,
         )
-        assert result.egress_port == 2
-        assert result.packet is not None
+        self.assertEqual(result.egress_port, 2)
+        self.assertIsNotNone(result.packet)
         # TTL should be decremented from 64 to 63.
-        assert result.packet[22] == 63
+        self.assertEqual(result.packet[22], 63)
 
     def test_drop_on_table_miss(self):
         program = _make_ipv4_forwarder()
@@ -182,7 +184,7 @@ class TestSimulator:
             ingress_port=1,
             table_entries={},
         )
-        assert result.dropped
+        self.assertTrue(result.dropped)
 
     def test_lpm_match(self):
         """LPM table matches the longest prefix."""
@@ -229,7 +231,7 @@ class TestSimulator:
             V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
         )
 
-        # 10.0.0.0/8 → port 1, 10.0.0.0/24 → port 2
+        # 10.0.0.0/8 -> port 1, 10.0.0.0/24 -> port 2
         # Packet to 10.0.0.2 should match /24 (longest prefix).
         table_entries = {
             "ipv4_lpm": [
@@ -250,8 +252,8 @@ class TestSimulator:
         result = simulate(
             program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
         )
-        assert not result.dropped
-        assert result.egress_port == 2
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 2)
 
     def test_lpm_no_match(self):
         """LPM table falls through to default when no prefix matches."""
@@ -298,7 +300,7 @@ class TestSimulator:
             V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
         )
 
-        # Entry for 192.168.0.0/16, packet goes to 10.0.0.2 — no match.
+        # Entry for 192.168.0.0/16, packet goes to 10.0.0.2 -- no match.
         table_entries = {
             "ipv4_lpm": [
                 {
@@ -312,7 +314,7 @@ class TestSimulator:
         result = simulate(
             program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
         )
-        assert result.dropped
+        self.assertTrue(result.dropped)
 
     def test_switch_action_run(self):
         """Switch on action_run routes to fallback table on miss."""
@@ -341,7 +343,7 @@ class TestSimulator:
             def forward(port: p4.bit(9)):
                 std_meta.egress_spec = port
 
-            # Exact table — miss triggers LPM fallback.
+            # Exact table -- miss triggers LPM fallback.
             ipv4_fib = p4.table(
                 key={hdr.ipv4.dstAddr: p4.exact},
                 actions=[on_miss, forward],
@@ -368,7 +370,7 @@ class TestSimulator:
             V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
         )
 
-        # No exact match entry, but LPM entry matches → forward to port 3.
+        # No exact match entry, but LPM entry matches -> forward to port 3.
         table_entries = {
             "ipv4_fib_lpm": [
                 {
@@ -382,8 +384,8 @@ class TestSimulator:
         result = simulate(
             program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
         )
-        assert not result.dropped
-        assert result.egress_port == 3
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 3)
 
     def test_switch_action_run_hit(self):
         """Switch on action_run skips fallback when action matches."""
@@ -438,7 +440,7 @@ class TestSimulator:
             V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
         )
 
-        # Exact match hits → forward to port 5. LPM entry exists but should
+        # Exact match hits -> forward to port 5. LPM entry exists but should
         # NOT be used because ipv4_fib matched.
         table_entries = {
             "ipv4_fib": [
@@ -460,8 +462,8 @@ class TestSimulator:
         result = simulate(
             program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
         )
-        assert not result.dropped
-        assert result.egress_port == 5
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 5)
 
     def test_extract_fails_on_short_packet(self):
         """Extract fails when packet is too short for the header."""
@@ -480,10 +482,10 @@ class TestSimulator:
             ingress_port=0,
             table_entries={},
         )
-        # IPv4 extract should fail, so isValid() is false → deparser skips
+        # IPv4 extract should fail, so isValid() is false -> deparser skips
         # emitting ipv4. Output should be same length as input.
-        assert not result.dropped
-        assert len(result.packet) == len(short_packet)
+        self.assertFalse(result.dropped)
+        self.assertLen(result.packet, len(short_packet))
 
     def test_drop_non_ipv4(self):
         # Non-IPv4 packet (etherType=0x0806 ARP).
@@ -497,4 +499,8 @@ class TestSimulator:
             ingress_port=1,
             table_entries={},
         )
-        assert result.dropped
+        self.assertTrue(result.dropped)
+
+
+if __name__ == "__main__":
+    absltest.main()

@@ -1,5 +1,7 @@
 """Test that the emitter handles checksum controls."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.backend.p4 import emit
@@ -107,7 +109,7 @@ def TestDeparser(pkt, hdr):
     pkt.emit(hdr.ethernet)
 
 
-class TestChecksumEmit:
+class TestChecksumEmit(absltest.TestCase):
     def test_checksum_controls_emitted(self):
         """Checksum controls emit verify/update_checksum calls."""
         main = v1model.V1Switch(
@@ -119,17 +121,17 @@ class TestChecksumEmit:
         )
         program = compile(main)
         p4_src = emit(program)
-        assert "control TestVerifyChecksum(" in p4_src
-        assert "verify_checksum(" in p4_src
-        assert "hdr.ipv4.version" in p4_src
-        assert "HashAlgorithm.csum16" in p4_src
-        assert "control TestComputeChecksum(" in p4_src
-        assert "update_checksum(" in p4_src
+        self.assertIn("control TestVerifyChecksum(", p4_src)
+        self.assertIn("verify_checksum(", p4_src)
+        self.assertIn("hdr.ipv4.version", p4_src)
+        self.assertIn("HashAlgorithm.csum16", p4_src)
+        self.assertIn("control TestComputeChecksum(", p4_src)
+        self.assertIn("update_checksum(", p4_src)
         # Main should use actual names
-        assert "TestVerifyChecksum()" in p4_src
-        assert "TestComputeChecksum()" in p4_src
-        assert "MyVerifyChecksum()" not in p4_src
-        assert "MyComputeChecksum()" not in p4_src
+        self.assertIn("TestVerifyChecksum()", p4_src)
+        self.assertIn("TestComputeChecksum()", p4_src)
+        self.assertNotIn("MyVerifyChecksum()", p4_src)
+        self.assertNotIn("MyComputeChecksum()", p4_src)
 
     def test_no_checksum_emits_empty_placeholder(self):
         """Pipeline without checksum emits empty stubs."""
@@ -140,5 +142,9 @@ class TestChecksumEmit:
         )
         program = compile(main)
         p4_src = emit(program)
-        assert "MyVerifyChecksum" in p4_src
-        assert "MyComputeChecksum" in p4_src
+        self.assertIn("MyVerifyChecksum", p4_src)
+        self.assertIn("MyComputeChecksum", p4_src)
+
+
+if __name__ == "__main__":
+    absltest.main()

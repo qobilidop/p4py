@@ -1,5 +1,7 @@
 """Test that the simulator executes checksum verify and update."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.compiler import compile
@@ -144,8 +146,8 @@ def _compute_ipv4_checksum(ipv4_bytes: bytes) -> int:
     return (~total) & 0xFFFF
 
 
-class TestChecksumSim:
-    def setup_method(self):
+class TestChecksumSim(absltest.TestCase):
+    def setUp(self):
         self.program = compile(main)
 
     def test_update_checksum_recomputes_after_ttl_change(self):
@@ -182,15 +184,15 @@ class TestChecksumSim:
             ingress_port=0,
             table_entries=entries,
         )
-        assert not result.dropped
-        assert result.egress_port == 5
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 5)
         # TTL decremented: 64 -> 63
-        assert result.packet[22] == 63
+        self.assertEqual(result.packet[22], 63)
         # Checksum should be recomputed for the new TTL.
         output_ipv4 = result.packet[14:34]
         expected_csum = _compute_ipv4_checksum(output_ipv4)
         actual_csum = (output_ipv4[10] << 8) | output_ipv4[11]
-        assert actual_csum == expected_csum
+        self.assertEqual(actual_csum, expected_csum)
 
     def test_checksum_not_updated_when_condition_false(self):
         """update_checksum skips when condition is false (invalid header)."""
@@ -207,5 +209,9 @@ class TestChecksumSim:
             table_entries={},
         )
         # Packet passes through unchanged.
-        assert not result.dropped
-        assert result.packet == arp_packet
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.packet, arp_packet)
+
+
+if __name__ == "__main__":
+    absltest.main()

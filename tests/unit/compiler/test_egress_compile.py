@@ -1,5 +1,7 @@
 """Test that egress control blocks are compiled to IR."""
 
+from absl.testing import absltest
+
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.compiler import compile
@@ -65,7 +67,7 @@ def TestDeparser(pkt, hdr):
     pkt.emit(hdr.ethernet)
 
 
-class TestEgressCompile:
+class TestEgressCompile(absltest.TestCase):
     def test_egress_compiled_to_ir(self):
         """Pipeline with egress produces IR with egress ControlDecl."""
         main = v1model.V1Switch(
@@ -75,11 +77,11 @@ class TestEgressCompile:
             deparser=TestDeparser,
         )
         program = compile(main)
-        assert program.egress is not None
-        assert program.egress.name == "TestEgress"
-        assert len(program.egress.actions) == 2
-        assert len(program.egress.tables) == 1
-        assert program.egress.tables[0].name == "rewrite_table"
+        self.assertIsNotNone(program.egress)
+        self.assertEqual(program.egress.name, "TestEgress")
+        self.assertLen(program.egress.actions, 2)
+        self.assertLen(program.egress.tables, 1)
+        self.assertEqual(program.egress.tables[0].name, "rewrite_table")
 
     def test_no_egress_produces_none(self):
         """Pipeline without egress produces IR with egress=None."""
@@ -89,4 +91,8 @@ class TestEgressCompile:
             deparser=TestDeparser,
         )
         program = compile(main)
-        assert program.egress is None
+        self.assertIsNone(program.egress)
+
+
+if __name__ == "__main__":
+    absltest.main()

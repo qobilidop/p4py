@@ -3,23 +3,35 @@ load("@rules_python//python:defs.bzl", "py_test")
 py_test(
     name = "test_sim",
     srcs = ["test_sim.py"],
-    deps = ["//src/p4py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
 )
 
 py_test(
     name = "test_std_meta_table_key",
     srcs = ["test_std_meta_table_key.py"],
-    deps = ["//src/p4py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
 )
 
 py_test(
     name = "test_egress_sim",
     srcs = ["test_egress_sim.py"],
-    deps = ["//src/p4py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
 )
 
 py_test(
     name = "test_checksum_sim",
     srcs = ["test_checksum_sim.py"],
-    deps = ["//src/p4py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
 )
