@@ -407,6 +407,12 @@ def _emit_expression(expr: ir.Expression) -> str:
         return f"({expr.type_name}) {_emit_expression(expr.expr)}"
     if isinstance(expr, ir.ConstRef):
         return expr.name
+    if isinstance(expr, ir.UnaryOp):
+        return f"!{_emit_expression(expr.operand)}"
+    if isinstance(expr, ir.CompareOp):
+        return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
+    if isinstance(expr, ir.LogicalOp):
+        return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 

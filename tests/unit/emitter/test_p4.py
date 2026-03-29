@@ -211,6 +211,43 @@ class TestEmitExpression(absltest.TestCase):
         result = p4_emitter._emit_expression(ref)
         self.assertEqual(result, "ETHERTYPE_IPV4")
 
+    def test_emit_unary_not(self):
+        """UnaryOp('!') emits as !operand."""
+        expr = ir.UnaryOp(op="!", operand=ir.FieldAccess(path=("x",)))
+        self.assertEqual(p4_emitter._emit_expression(expr), "!x")
+
+    def test_emit_compare_eq(self):
+        """CompareOp('==') emits as left == right."""
+        expr = ir.CompareOp(
+            op="==", left=ir.FieldAccess(path=("a",)), right=ir.IntLiteral(value=0)
+        )
+        self.assertEqual(p4_emitter._emit_expression(expr), "a == 0")
+
+    def test_emit_compare_neq(self):
+        """CompareOp('!=') emits as left != right."""
+        expr = ir.CompareOp(
+            op="!=", left=ir.FieldAccess(path=("a",)), right=ir.IntLiteral(value=1)
+        )
+        self.assertEqual(p4_emitter._emit_expression(expr), "a != 1")
+
+    def test_emit_logical_and(self):
+        """LogicalOp('&&') emits as left && right."""
+        expr = ir.LogicalOp(
+            op="&&",
+            left=ir.FieldAccess(path=("a",)),
+            right=ir.FieldAccess(path=("b",)),
+        )
+        self.assertEqual(p4_emitter._emit_expression(expr), "a && b")
+
+    def test_emit_logical_or(self):
+        """LogicalOp('||') emits as left || right."""
+        expr = ir.LogicalOp(
+            op="||",
+            left=ir.FieldAccess(path=("a",)),
+            right=ir.FieldAccess(path=("b",)),
+        )
+        self.assertEqual(p4_emitter._emit_expression(expr), "a || b")
+
 
 if __name__ == "__main__":
     absltest.main()
