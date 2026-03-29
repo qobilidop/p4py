@@ -31,6 +31,33 @@ class TestTypedef(absltest.TestCase):
         self.assertEqual(meta_t._p4_members[0], ("vrf", MyBit))
 
 
+class TestEnum(absltest.TestCase):
+    def test_basic(self):
+        class MeterColor_t(p4.enum(p4.bit(2))):
+            GREEN = 0
+            YELLOW = 1
+            RED = 2
+
+        self.assertEqual(MeterColor_t._p4_name, "MeterColor_t")
+        self.assertEqual(MeterColor_t._p4_underlying, p4.bit(2))
+        self.assertEqual(MeterColor_t._p4_kind, "enum")
+        self.assertEqual(MeterColor_t.width, 2)
+        self.assertEqual(
+            MeterColor_t._p4_members,
+            (("GREEN", 0), ("YELLOW", 1), ("RED", 2)),
+        )
+
+    def test_struct_member_accepts_enum(self):
+        class Color_t(p4.enum(p4.bit(2))):
+            A = 0
+            B = 1
+
+        class meta_t(p4.struct):
+            color: Color_t
+
+        self.assertEqual(meta_t._p4_members[0], ("color", Color_t))
+
+
 class TestNewtype(absltest.TestCase):
     def test_basic(self):
         PortId_t = p4.newtype(p4.bit(9), "PortId_t")

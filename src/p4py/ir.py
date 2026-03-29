@@ -60,6 +60,19 @@ class NewtypeDecl:
     type: BitType
 
 
+@dataclass(frozen=True)
+class EnumMember:
+    name: str
+    value: int
+
+
+@dataclass(frozen=True)
+class EnumDecl:
+    name: str
+    underlying_type: BitType
+    members: tuple[EnumMember, ...]
+
+
 # --- Expressions ---
 
 

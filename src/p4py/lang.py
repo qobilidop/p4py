@@ -57,6 +57,34 @@ def newtype(underlying: BitType, name: str) -> _NamedType:
     return _NamedType(underlying, name, "newtype")
 
 
+# --- enum ---
+
+
+def enum(underlying: BitType):
+    """Return a base class for a P4 serializable enum.
+
+    Usage:
+        class Color_t(p4.enum(p4.bit(2))):
+            GREEN = 0
+            YELLOW = 1
+    """
+
+    class _EnumBase:
+        def __init_subclass__(cls, **kwargs: object) -> None:
+            super().__init_subclass__(**kwargs)
+            members = []
+            for attr, val in cls.__dict__.items():
+                if not attr.startswith("_") and isinstance(val, int):
+                    members.append((attr, val))
+            cls._p4_name = cls.__name__
+            cls._p4_underlying = underlying
+            cls._p4_members = tuple(members)
+            cls._p4_kind = "enum"
+            cls.width = underlying.width
+
+    return _EnumBase
+
+
 # --- header ---
 
 
