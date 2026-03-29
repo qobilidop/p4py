@@ -155,6 +155,12 @@ class ConstRef:
     name: str
 
 
+@dataclass(frozen=True)
+class UnaryOp:
+    op: str  # "!"
+    operand: Expression
+
+
 Expression = (
     FieldAccess
     | IntLiteral
@@ -166,6 +172,7 @@ Expression = (
     | Wildcard
     | Cast
     | ConstRef
+    | UnaryOp
 )
 
 

@@ -291,6 +291,13 @@ class TestConstRefExpression(absltest.TestCase):
         self.assertEqual(ref.name, "ETHERTYPE_IPV4")
 
 
+class TestUnaryOp(absltest.TestCase):
+    def test_unary_op(self):
+        expr = nodes.UnaryOp(op="!", operand=nodes.FieldAccess(path=("x",)))
+        self.assertEqual(expr.op, "!")
+        self.assertIsInstance(expr.operand, nodes.FieldAccess)
+
+
 class TestNodesFrozen(absltest.TestCase):
     def test_nodes_are_frozen(self):
         t = nodes.BitType(width=8)
