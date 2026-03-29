@@ -349,6 +349,44 @@ class TestCompileProgram(absltest.TestCase):
         self.assertEqual(inner.members[0], nodes.StructMember("vrf", nodes.BitType(12)))
 
 
+class TestCompileCast(absltest.TestCase):
+    def test_compile_cast_in_parser(self):
+        """Cast expression in parser state compiles to Cast IR."""
+        port_id_t = p4.newtype(p4.bit(9), "port_id_t")
+
+        class h_t(p4.header):
+            f: p4.bit(8)
+
+        class _headers_t(p4.struct):
+            h: h_t
+
+        class _meta_t(p4.struct):
+            ingress_port: port_id_t
+
+        @p4.parser
+        def MyParser(pkt, hdr: _headers_t, meta: _meta_t, std_meta):
+            def start():
+                meta.ingress_port = p4.cast(port_id_t, std_meta.ingress_port)
+                return p4.ACCEPT
+
+        main = V1Switch(
+            parser=MyParser,
+            verify_checksum=None,
+            ingress=None,
+            egress=None,
+            compute_checksum=None,
+            deparser=None,
+        )
+        pkg = compile(main)
+        parser_decl = pkg.blocks[0].decl
+        start_state = parser_decl.states[0]
+        self.assertLen(start_state.body, 1)
+        assign = start_state.body[0]
+        self.assertIsInstance(assign, nodes.Assignment)
+        self.assertIsInstance(assign.value, nodes.Cast)
+        self.assertEqual(assign.value.type_name, "port_id_t")
+
+
 class TestCompileEbpf(absltest.TestCase):
     def test_compile_init_ebpf(self):
         """Compile a minimal eBPF program to IR."""

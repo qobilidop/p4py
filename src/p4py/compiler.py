@@ -236,6 +236,22 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
             value=_ast_to_expression(node.args[0]),
             mask=_ast_to_expression(node.args[1]),
         )
+    # p4.cast(type, expr) → Cast
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "cast"
+        and len(node.args) == 2
+    ):
+        type_arg = node.args[0]
+        if isinstance(type_arg, ast.Name):
+            type_name = type_arg.id
+        elif isinstance(type_arg, ast.Attribute):
+            type_name = type_arg.attr
+        else:
+            raise ValueError(f"Unsupported cast type: {ast.dump(type_arg)}")
+        inner_expr = _ast_to_expression(node.args[1])
+        return ir.Cast(type_name=type_name, expr=inner_expr)
     if isinstance(node, ast.Constant) and node.value is None:
         return ir.Wildcard()
     if isinstance(node, (ast.Attribute, ast.Name)):
