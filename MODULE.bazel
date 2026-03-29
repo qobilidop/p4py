@@ -7,7 +7,7 @@ bazel_dep(name = "p4c", version = "1.2.5.11")
 # Enable the eBPF target in p4testgen (BCR default is bmv2-only).
 single_version_override(
     module_name = "p4c",
-    patches = ["//patches:p4c_testgen_ebpf.patch"],
+    patches = ["//bazel/patches:p4c_testgen_ebpf.patch"],
     patch_strip = 1,
 )
 bazel_dep(name = "rules_python", version = "1.7.0")
