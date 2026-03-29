@@ -16,19 +16,17 @@ import tempfile
 
 from p4py.backend.p4 import emit
 from p4py.compiler import compile
+from p4py.ir.nodes import EbpfProgram
 from p4py.sim import simulate
 from tests.infra.stf_runner import match_hex, stf_to_sim_inputs
 
 
-def _find_p4include(p4testgen_path: str) -> str:
-    """Derive the p4include directory from the p4testgen binary path.
+def _p4c_root(p4testgen_path: str) -> str:
+    """Derive the p4c root from the p4testgen binary path.
 
-    The binary is at {runfiles}/p4c+/backends/p4tools/p4testgen and the
-    include files are at {runfiles}/p4c+/p4include.
+    The binary is at {runfiles}/p4c+/backends/p4tools/p4testgen.
     """
-    # Walk up from backends/p4tools/p4testgen to p4c+ root, then into p4include.
-    p4c_root = os.path.dirname(os.path.dirname(os.path.dirname(p4testgen_path)))
-    return os.path.join(p4c_root, "p4include")
+    return os.path.dirname(os.path.dirname(os.path.dirname(p4testgen_path)))
 
 
 def _run_p4testgen(
@@ -39,7 +37,8 @@ def _run_p4testgen(
     arch: str = "v1model",
 ) -> list[str]:
     """Run p4testgen on a P4 file. Returns paths to generated STF files."""
-    p4include = _find_p4include(p4testgen_path)
+    root = _p4c_root(p4testgen_path)
+    p4include = os.path.join(root, "p4include")
     cmd = [
         p4testgen_path,
         "-I",
@@ -47,8 +46,7 @@ def _run_p4testgen(
     ]
     if target == "ebpf":
         # eBPF model includes are in a separate directory.
-        p4c_root = os.path.dirname(os.path.dirname(os.path.dirname(p4testgen_path)))
-        ebpf_include = os.path.join(p4c_root, "backends", "ebpf", "p4include")
+        ebpf_include = os.path.join(root, "backends", "ebpf", "p4include")
         cmd.extend(["-I", ebpf_include])
     cmd.extend([
         "--target",
@@ -78,8 +76,6 @@ def run_p4testgen_test(module_path: str, p4testgen_path: str) -> bool:
     p4_source = emit(program)
 
     # Detect target/arch from program type.
-    from p4py.ir.nodes import EbpfProgram
-
     if isinstance(program, EbpfProgram):
         target, arch = "ebpf", "ebpf"
     else:

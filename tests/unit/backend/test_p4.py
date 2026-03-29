@@ -183,7 +183,7 @@ class TestEmitEbpf(absltest.TestCase):
         self.assertIn("#include <core.p4>", source)
         self.assertIn("#include <ebpf_model.p4>", source)
         self.assertIn("parser prs(packet_in p, out Headers_t headers)", source)
-        self.assertIn("control pipe(inout Headers_t headers, out bool pass)", source)
+        self.assertIn("control pipe(inout Headers_t headers, out bool accept)", source)
         self.assertIn("bool act", source)
         self.assertIn("const entries", source)
         self.assertIn("implementation = hash_table(64)", source)
