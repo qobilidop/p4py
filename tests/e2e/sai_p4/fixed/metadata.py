@@ -1,7 +1,6 @@
 """P4Py translation of sai_p4/fixed/metadata.p4 (PLATFORM_BMV2)."""
 
 import p4py.lang as p4
-
 from tests.e2e.sai_p4.fixed.headers import (
     arp_t,
     ethernet_addr_t,

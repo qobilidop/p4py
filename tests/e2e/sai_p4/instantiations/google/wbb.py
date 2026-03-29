@@ -2,12 +2,11 @@
 
 import p4py.lang as p4
 from p4py.arch.v1model import V1Switch
-
 from tests.e2e.sai_p4.fixed.headers import (
     INTERNAL_VLAN_ID,
     NO_VLAN_ID,
-    ethernet_addr_t,
     ether_type_t,
+    ethernet_addr_t,
     ipv4_addr_t,
     ipv6_addr_t,
     vlan_id_t,

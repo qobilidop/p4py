@@ -4,10 +4,10 @@ from absl.testing import absltest
 
 from p4py import ir
 from p4py.emitter.p4 import (
-    _emit_typedef,
-    _emit_newtype,
-    _emit_enum,
     _emit_const,
+    _emit_enum,
+    _emit_newtype,
+    _emit_typedef,
 )
 
 
