@@ -122,6 +122,7 @@ def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> No
     action_token = ""
     key_pairs: list[tuple[str, str]] = []
     in_action = False
+    priority = 0
 
     for token in tokens[1:]:
         if "(" in token and not in_action:
@@ -134,6 +135,8 @@ def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> No
             action_token += " " + token
             if ")" in token:
                 in_action = False
+        elif token.startswith("priority:"):
+            priority = int(token.split(":", 1)[1])
         elif ":" in token:
             field, value = token.split(":", 1)
             key_pairs.append((field, value))
@@ -147,18 +150,27 @@ def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> No
             name, value = param.strip().split(":", 1)
             action_args[name.strip()] = int(value.strip(), 0)
 
-    # Build key dict, extracting LPM prefix lengths.
+    # Build key dict, extracting LPM prefix lengths and ternary masks.
     key_dict: dict[str, int] = {}
     prefix_len_dict: dict[str, int] = {}
+    mask_dict: dict[str, int] = {}
     for field, value in key_pairs:
         if "/" in value:
             val_str, plen_str = value.rsplit("/", 1)
             key_dict[field] = int(val_str.replace("*", "0"), 0)
             prefix_len_dict[field] = int(plen_str)
+        elif "&&&" in value:
+            val_str, mask_str = value.split("&&&", 1)
+            key_dict[field] = int(val_str.replace("*", "0"), 0)
+            mask_dict[field] = int(mask_str, 0)
         else:
             key_dict[field] = int(value.replace("*", "0"), 0)
 
     entry: dict = {"key": key_dict, "action": action_name, "args": action_args}
     if prefix_len_dict:
         entry["prefix_len"] = prefix_len_dict
+    if mask_dict:
+        entry["mask"] = mask_dict
+    if priority:
+        entry["priority"] = priority
     table_entries.setdefault(table, []).append(entry)

@@ -228,15 +228,17 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
         field_widths[field_path] = _resolve_field_width(state, table_key.field)
 
     best_match = None
-    best_prefix_len = -1
+    best_score = -1
     for entry in entries:
         if _entry_matches(entry, lookup_key, match_kinds, field_widths):
+            priority = entry.get("priority", 0)
             prefix_total = sum(
                 entry.get("prefix_len", {}).get(k, 0) for k in lookup_key
             )
-            if prefix_total > best_prefix_len:
+            score = priority + prefix_total
+            if score > best_score:
                 best_match = entry
-                best_prefix_len = prefix_total
+                best_score = score
 
     if best_match is not None:
         action_name = best_match["action"]
@@ -360,6 +362,10 @@ def _entry_matches(
             width = field_widths[field_path]
             shift = width - prefix_len
             if (value >> shift) != (entry_value >> shift):
+                return False
+        elif kind == "ternary":
+            mask = entry.get("mask", {}).get(field_path, 0)
+            if (value & mask) != (entry_value & mask):
                 return False
     return True
 
