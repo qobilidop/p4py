@@ -7,8 +7,19 @@ and V1Switch pipeline.
 from dataclasses import dataclass
 
 import p4py.lang as p4
-from p4py.lang import _Spec
 from p4py.arch.base import Architecture, BlockSpec
+from p4py.lang import _Spec
+
+
+_DROP_PORT = 511
+
+
+def _get_block(package, name):
+    """Look up a block declaration by name, returning None if absent."""
+    for entry in package.blocks:
+        if entry.name == name:
+            return entry.decl
+    return None
 
 
 class standard_metadata_t(p4.header):
@@ -83,18 +94,22 @@ class V1ModelArch(Architecture):
         h = struct_names["headers"]
         m = struct_names["metadata"]
         if block_name == "parser":
-            return (f"parser {{name}}(packet_in pkt,\n"
-                    f"                out {h} hdr,\n"
-                    f"                inout {m} meta,\n"
-                    f"                inout standard_metadata_t std_meta)")
+            return (
+                f"parser {{name}}(packet_in pkt,\n"
+                f"                out {h} hdr,\n"
+                f"                inout {m} meta,\n"
+                f"                inout standard_metadata_t std_meta)"
+            )
         if block_name in ("verify_checksum", "compute_checksum"):
             return f"control {{name}}(inout {h} hdr, inout {m} meta)"
         if block_name == "deparser":
             return f"control {{name}}(packet_out pkt, in {h} hdr)"
         # ingress, egress
-        return (f"control {{name}}(inout {h} hdr,\n"
-                f"                  inout {m} meta,\n"
-                f"                  inout standard_metadata_t std_meta)")
+        return (
+            f"control {{name}}(inout {h} hdr,\n"
+            f"                  inout {m} meta,\n"
+            f"                  inout standard_metadata_t std_meta)"
+        )
 
     def main_instantiation(self, block_names):
         names = []
@@ -106,7 +121,11 @@ class V1ModelArch(Architecture):
         h = struct_names["headers"]
         m = struct_names["metadata"]
         if spec.name in ("verify_checksum", "compute_checksum"):
-            cap = "MyVerifyChecksum" if spec.name == "verify_checksum" else "MyComputeChecksum"
+            cap = (
+                "MyVerifyChecksum"
+                if spec.name == "verify_checksum"
+                else "MyComputeChecksum"
+            )
             lines.append(f"control {cap}(inout {h} hdr, inout {m} meta) {{")
             lines.append("    apply {}")
             lines.append("}")
@@ -120,7 +139,78 @@ class V1ModelArch(Architecture):
             lines.append("")
 
     def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
-        raise NotImplementedError("Implemented in Task 7")
+        from p4py.sim.simulator import SimResult
+
+        eng = engine_cls(package, packet, table_entries)
+
+        # Initialize v1model standard metadata.
+        eng.state.metadata["ingress_port"] = ingress_port
+        eng.state.metadata["egress_spec"] = 0
+        eng.state.metadata_widths["ingress_port"] = 9
+        eng.state.metadata_widths["egress_spec"] = 9
+
+        eng.register_extern("mark_to_drop", self._mark_to_drop(eng))
+        eng.register_extern("verify_checksum", self._verify_checksum(eng))
+        eng.register_extern("update_checksum", self._update_checksum(eng))
+
+        eng.run_parser(_get_block(package, "parser"))
+
+        vc = _get_block(package, "verify_checksum")
+        if vc is not None:
+            eng.run_control(vc)
+
+        eng.run_control(_get_block(package, "ingress"))
+
+        if eng.state.metadata["egress_spec"] == _DROP_PORT:
+            return SimResult(packet=None, egress_port=_DROP_PORT, dropped=True)
+
+        egress = _get_block(package, "egress")
+        if egress is not None:
+            eng.run_control(egress)
+
+        cc = _get_block(package, "compute_checksum")
+        if cc is not None:
+            eng.run_control(cc)
+
+        output = eng.run_deparser(_get_block(package, "deparser"))
+        return SimResult(
+            packet=output,
+            egress_port=eng.state.metadata["egress_spec"],
+            dropped=False,
+        )
+
+    @staticmethod
+    def _mark_to_drop(engine):
+        def handler(stmt):
+            engine.state.metadata["egress_spec"] = _DROP_PORT
+
+        return handler
+
+    @staticmethod
+    def _verify_checksum(engine):
+        def handler(stmt):
+            pass  # No-op in simulation.
+
+        return handler
+
+    @staticmethod
+    def _update_checksum(engine):
+        def handler(stmt):
+            from p4py.sim.engine import compute_csum16
+
+            cond_val = engine.eval_expression(stmt.args[0])
+            if not cond_val:
+                return
+            data_list = stmt.args[1]  # ListExpression
+            field_values = []
+            for fa in data_list.elements:
+                value = engine.eval_expression(fa)
+                width = engine.resolve_field_width(fa)
+                field_values.append((value, width))
+            checksum = compute_csum16(field_values)
+            engine.set_field(stmt.args[2], checksum)
+
+        return handler
 
 
 _V1MODEL_ARCH = V1ModelArch()

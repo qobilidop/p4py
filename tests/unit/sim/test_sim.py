@@ -585,8 +585,8 @@ class TestSimulator(absltest.TestCase):
 class TestParserRejectDetection(absltest.TestCase):
     def test_run_parser_returns_accept(self):
         """_run_parser returns 'accept' for a valid packet."""
-        from p4py.sim.simulator import _run_parser, _SimState, _HeaderInstance
         from p4py.ir import nodes
+        from p4py.sim.engine import _HeaderInstance, _SimState, _run_parser
 
         eth_type = nodes.HeaderType(
             name="ethernet_t",
@@ -617,16 +617,16 @@ class TestParserRejectDetection(absltest.TestCase):
             cursor=0,
             headers={"ethernet": _HeaderInstance(type_info=eth_type)},
             metadata={},
-            std_meta={},
+            metadata_widths={},
             program=None,
         )
-        result = _run_parser(state, parser)
+        result = _run_parser(state, parser, {})
         self.assertEqual(result, "accept")
 
     def test_run_parser_returns_accept_on_short_packet(self):
         """_run_parser returns 'accept' even with short packet (header stays invalid)."""
-        from p4py.sim.simulator import _run_parser, _SimState, _HeaderInstance
         from p4py.ir import nodes
+        from p4py.sim.engine import _HeaderInstance, _SimState, _run_parser
 
         eth_type = nodes.HeaderType(
             name="ethernet_t",
@@ -657,10 +657,10 @@ class TestParserRejectDetection(absltest.TestCase):
             cursor=0,
             headers={"ethernet": _HeaderInstance(type_info=eth_type)},
             metadata={},
-            std_meta={},
+            metadata_widths={},
             program=None,
         )
-        result = _run_parser(state, parser)
+        result = _run_parser(state, parser, {})
         self.assertEqual(result, "accept")
 
 

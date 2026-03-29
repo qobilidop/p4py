@@ -1,5 +1,5 @@
-"""P4Mini simulator."""
+"""P4 simulator."""
 
-from p4py.sim.simulator import simulate
+from p4py.sim.simulator import SimResult, simulate
 
-__all__ = ["simulate"]
+__all__ = ["SimResult", "simulate"]
