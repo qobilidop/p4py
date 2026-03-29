@@ -81,6 +81,19 @@ class ConstDecl:
     value: int
 
 
+@dataclass(frozen=True)
+class DirectCounter:
+    name: str
+    counter_type: str  # "packets_and_bytes", "packets", "bytes"
+
+
+@dataclass(frozen=True)
+class DirectMeter:
+    name: str
+    result_type_name: str
+    meter_type: str  # "bytes", "packets"
+
+
 # --- Expressions ---
 
 

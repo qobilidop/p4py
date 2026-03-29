@@ -73,6 +73,59 @@ verify_checksum = _ChecksumExtern("verify_checksum")
 update_checksum = _ChecksumExtern("update_checksum")
 
 
+class _DirectCounter:
+    """A v1model direct counter attached to a table."""
+
+    def __init__(self, counter_type: str) -> None:
+        self._p4_name = "direct_counter"
+        self._p4_counter_type = counter_type
+        self._p4_kind = "direct_counter"
+
+    def __repr__(self) -> str:
+        return f"direct_counter(CounterType.{self._p4_counter_type})"
+
+
+def direct_counter(counter_type: str) -> _DirectCounter:
+    """Create a v1model direct_counter."""
+    return _DirectCounter(counter_type)
+
+
+class _DirectMeter:
+    """A v1model direct meter attached to a table."""
+
+    def __init__(self, result_type, meter_type: str) -> None:
+        self._p4_name = "direct_meter"
+        self._p4_meter_type = meter_type
+        self._p4_result_type = result_type
+        self._p4_kind = "direct_meter"
+
+    def __repr__(self) -> str:
+        return f"direct_meter<{self._p4_result_type._p4_name}>(MeterType.{self._p4_meter_type})"
+
+
+def direct_meter(result_type, meter_type: str) -> _DirectMeter:
+    """Create a v1model direct_meter."""
+    return _DirectMeter(result_type, meter_type)
+
+
+class _CloneType:
+    def __init__(self, name: str) -> None:
+        self._p4_name = name
+
+    def __repr__(self) -> str:
+        return f"CloneType.{self._p4_name}"
+
+
+class CloneType:
+    I2E = _CloneType("I2E")
+    E2E = _CloneType("E2E")
+
+
+def clone(clone_type: _CloneType, session_id: int) -> None:
+    """v1model clone extern. Called at DSL capture time; compiler reads AST."""
+    pass
+
+
 class V1ModelArch(Architecture):
     @property
     def include(self) -> str:
