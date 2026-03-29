@@ -671,5 +671,121 @@ class TestParserRejectDetection(absltest.TestCase):
         self.assertEqual(result, "accept")
 
 
+class TestCastAndConstRef(absltest.TestCase):
+    def test_eval_cast_truncates(self):
+        """Cast evaluation truncates value to target type width."""
+        from p4py import ir
+
+        pkg = ir.Package(
+            arch=None,
+            headers=(),
+            structs=(),
+            blocks=(),
+            declarations=(ir.NewtypeDecl(name="port_id_t", type=ir.BitType(9)),),
+        )
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        # 510 fits in 9 bits
+        cast_expr = ir.Cast(type_name="port_id_t", expr=ir.IntLiteral(value=510))
+        result = _eval_expression(state, cast_expr, {})
+        self.assertEqual(result, 510)
+
+        # 1023 & 0x1FF = 511
+        cast_expr2 = ir.Cast(type_name="port_id_t", expr=ir.IntLiteral(value=1023))
+        result2 = _eval_expression(state, cast_expr2, {})
+        self.assertEqual(result2, 511)
+
+    def test_eval_const_ref(self):
+        """ConstRef evaluation resolves to the declared constant value."""
+        from p4py import ir
+
+        pkg = ir.Package(
+            arch=None,
+            headers=(),
+            structs=(),
+            blocks=(),
+            declarations=(
+                ir.ConstDecl(name="MY_CONST", type_name="bit<16>", value=42),
+            ),
+        )
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        ref_expr = ir.ConstRef(name="MY_CONST")
+        result = _eval_expression(state, ref_expr, {})
+        self.assertEqual(result, 42)
+
+    def test_const_ref_unknown_raises(self):
+        """ConstRef for unknown constant raises ValueError."""
+        from p4py import ir
+
+        pkg = ir.Package(
+            arch=None,
+            headers=(),
+            structs=(),
+            blocks=(),
+            declarations=(),
+        )
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        ref_expr = ir.ConstRef(name="MISSING")
+        with self.assertRaises(ValueError):
+            _eval_expression(state, ref_expr, {})
+
+    def test_select_with_const_ref(self):
+        """Parser select matches ConstRef case values."""
+        from p4py import ir
+        from p4py.sim.engine import _match_select, _SimState
+
+        pkg = ir.Package(
+            arch=None,
+            headers=(),
+            structs=(),
+            blocks=(),
+            declarations=(
+                ir.ConstDecl(name="ETHERTYPE_IPV4", type_name="bit<16>", value=0x0800),
+            ),
+        )
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        cases = (
+            ir.SelectCase(
+                value=ir.ConstRef(name="ETHERTYPE_IPV4"), next_state="parse_ipv4"
+            ),
+            ir.SelectCase(value=None, next_state="accept"),
+        )
+        self.assertEqual(_match_select(state, cases, 0x0800), "parse_ipv4")
+        self.assertEqual(_match_select(state, cases, 0x0806), "accept")
+
+
 if __name__ == "__main__":
     absltest.main()

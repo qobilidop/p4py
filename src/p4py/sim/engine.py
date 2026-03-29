@@ -157,19 +157,25 @@ def _run_parser(
             current = transition.next_state
         elif isinstance(transition, ir.TransitionSelect):
             field_val = _eval_expression(state, transition.field, {})
-            current = _match_select(transition.cases, field_val)
+            current = _match_select(state, transition.cases, field_val)
 
     return current
 
 
-def _match_select(cases: tuple[ir.SelectCase, ...], value: int) -> str:
+def _match_select(
+    state: _SimState, cases: tuple[ir.SelectCase, ...], value: int
+) -> str:
     """Find the matching case in a transition select."""
     default = None
     for case in cases:
         if case.value is None:
             default = case.next_state
-        elif case.value == value:
-            return case.next_state
+        else:
+            case_value = case.value
+            if isinstance(case_value, ir.ConstRef):
+                case_value = _eval_expression(state, case_value, {})
+            if case_value == value:
+                return case.next_state
     if default is not None:
         return default
     return "reject"
@@ -565,6 +571,22 @@ def _eval_expression(
         raise ValueError(f"Unknown op: {expr.op}")
     if isinstance(expr, ir.IsValid):
         return int(_eval_is_valid(state, expr))
+    if isinstance(expr, ir.Cast):
+        inner_val = _eval_expression(state, expr.expr, locals_)
+        for decl in state.program.declarations:
+            if (
+                isinstance(decl, (ir.TypedefDecl, ir.NewtypeDecl))
+                and decl.name == expr.type_name
+            ):
+                return inner_val & ((1 << decl.type.width) - 1)
+            if isinstance(decl, ir.EnumDecl) and decl.name == expr.type_name:
+                return inner_val & ((1 << decl.underlying_type.width) - 1)
+        return inner_val
+    if isinstance(expr, ir.ConstRef):
+        for decl in state.program.declarations:
+            if isinstance(decl, ir.ConstDecl) and decl.name == expr.name:
+                return decl.value
+        raise ValueError(f"Unknown constant: {expr.name}")
     raise ValueError(f"Cannot evaluate: {expr}")
 
 
