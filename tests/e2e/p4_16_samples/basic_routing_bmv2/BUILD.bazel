@@ -29,6 +29,7 @@ py_test(
     name = "basic_routing_bmv2_testgen_test",
     timeout = "moderate",
     srcs = ["basic_routing_bmv2_testgen_test.py"],
+    data = ["@p4c//backends/p4tools:p4testgen"],
     tags = ["e2e"],
     deps = [
         ":basic_routing_bmv2",

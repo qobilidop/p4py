@@ -13,9 +13,12 @@ from p4py.backend.p4 import emit
 from p4py.compiler import compile
 from p4py.sim import simulate
 from tests.e2e.p4_16_samples.basic_routing_bmv2.basic_routing_bmv2 import main
-from tests.infra.stf_runner import (
-    match_hex,
-    stf_to_sim_inputs,
+from tests.infra.stf_runner import match_hex, stf_to_sim_inputs
+
+_P4TESTGEN = os.path.join(
+    os.environ.get("TEST_SRCDIR", ""),
+    os.environ.get("TEST_WORKSPACE", "_main"),
+    "external/p4c+/backends/p4tools/p4testgen",
 )
 
 
@@ -23,7 +26,7 @@ def _run_p4testgen(p4_path: str, out_dir: str) -> list[str]:
     """Run p4testgen on a P4 file. Returns paths to generated STF files."""
     result = subprocess.run(
         [
-            "p4testgen",
+            _P4TESTGEN,
             "--target",
             "bmv2",
             "--arch",

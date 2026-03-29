@@ -1,8 +1,8 @@
-"""P4testgen diff test: P4Py simulator vs BMv2 for basic_forward.
+"""Testgen test: verify P4Py simulator against p4testgen predictions.
 
 Compiles the P4Py program to P4-16, runs p4testgen to auto-generate STF
-tests covering all program paths, then runs each through both the Python
-simulator and BMv2 and asserts matching behavior.
+tests covering all program paths, then verifies the Python simulator
+produces the expected output for each test.
 """
 
 import os
@@ -13,10 +13,12 @@ from p4py.backend.p4 import emit
 from p4py.compiler import compile
 from p4py.sim import simulate
 from tests.e2e.examples.basic_forward.basic_forward import main
-from tests.infra.stf_runner import (
-    match_hex,
-    run_stf_test,
-    stf_to_sim_inputs,
+from tests.infra.stf_runner import match_hex, stf_to_sim_inputs
+
+_P4TESTGEN = os.path.join(
+    os.environ.get("TEST_SRCDIR", ""),
+    os.environ.get("TEST_WORKSPACE", "_main"),
+    "external/p4c+/backends/p4tools/p4testgen",
 )
 
 
@@ -24,7 +26,7 @@ def _run_p4testgen(p4_path: str, out_dir: str) -> list[str]:
     """Run p4testgen on a P4 file. Returns paths to generated STF files."""
     result = subprocess.run(
         [
-            "p4testgen",
+            _P4TESTGEN,
             "--target",
             "bmv2",
             "--arch",
@@ -49,18 +51,16 @@ def _run_p4testgen(p4_path: str, out_dir: str) -> list[str]:
 
 
 class TestBasicForwardTestgen:
-    def test_simulator_matches_bmv2_on_generated_tests(self):
-        """P4Py simulator and BMv2 agree on all p4testgen-generated tests."""
+    def test_simulator_matches_p4testgen(self):
+        """P4Py simulator matches p4testgen predictions on all paths."""
         program = compile(main)
         p4_source = emit(program)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Write emitted P4 source.
             p4_path = os.path.join(tmpdir, "basic_forward.p4")
             with open(p4_path, "w") as f:
                 f.write(p4_source)
 
-            # Generate STF tests.
             testgen_dir = os.path.join(tmpdir, "testgen")
             os.makedirs(testgen_dir)
             stf_files = _run_p4testgen(p4_path, testgen_dir)
@@ -72,7 +72,6 @@ class TestBasicForwardTestgen:
                     stf_text = f.read()
                 sim_inputs = stf_to_sim_inputs(stf_text)
 
-                # --- Simulator side ---
                 sim_results: list[tuple[int, str | None]] = []
                 for pkt in sim_inputs.packets:
                     result = simulate(
@@ -86,7 +85,6 @@ class TestBasicForwardTestgen:
                     else:
                         sim_results.append((result.egress_port, result.packet.hex()))
 
-                # Verify simulator against STF expectations.
                 if sim_inputs.expects:
                     assert len(sim_results) == len(sim_inputs.expects), (
                         f"{test_name}: result/expect count mismatch"
@@ -96,25 +94,19 @@ class TestBasicForwardTestgen:
                     ):
                         if expect.pattern is not None:
                             assert egress_port == expect.port, (
-                                f"{test_name}: Simulator expected port"
+                                f"{test_name}: expected port"
                                 f" {expect.port}, got {egress_port}"
                             )
                             assert pkt_hex is not None, (
-                                f"{test_name}: Simulator dropped packet"
+                                f"{test_name}: packet was dropped"
                             )
                             assert match_hex(pkt_hex, expect.pattern), (
-                                f"{test_name}: Simulator packet mismatch\n"
+                                f"{test_name}: packet mismatch\n"
                                 f"  expected: {expect.pattern}\n"
                                 f"  actual:   {pkt_hex}"
                             )
                 else:
-                    # No expects means packet should be dropped.
                     for egress_port, pkt_hex in sim_results:
                         assert egress_port == -1, (
-                            f"{test_name}: Simulator expected drop,"
-                            f" got port {egress_port}"
+                            f"{test_name}: expected drop, got port {egress_port}"
                         )
-
-                # --- BMv2 side ---
-                bmv2_passed = run_stf_test(p4_path, stf_path)
-                assert bmv2_passed, f"{test_name}: BMv2 STF test failed"

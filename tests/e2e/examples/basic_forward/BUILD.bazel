@@ -18,6 +18,7 @@ py_test(
     name = "basic_forward_testgen_test",
     timeout = "moderate",
     srcs = ["basic_forward_testgen_test.py"],
+    data = ["@p4c//backends/p4tools:p4testgen"],
     tags = ["e2e"],
     deps = [
         ":basic_forward",
