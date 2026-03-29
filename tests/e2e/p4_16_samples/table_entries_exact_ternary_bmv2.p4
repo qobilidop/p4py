@@ -16,12 +16,12 @@ struct Header_t {
 struct Meta_t {
 }
 
-parser p_(packet_in pkt,
-                out Header_t hdr,
-                inout Meta_t meta,
-                inout standard_metadata_t std_meta) {
+parser p(packet_in b,
+                out Header_t h,
+                inout Meta_t m,
+                inout standard_metadata_t sm) {
     state start {
-        pkt.extract(hdr.h);
+        b.extract(h.h);
         transition accept;
     }
 }
@@ -30,21 +30,21 @@ control MyVerifyChecksum(inout Header_t hdr, inout Meta_t meta) {
     apply {}
 }
 
-control ingress(inout Header_t hdr,
-                  inout Meta_t meta,
-                  inout standard_metadata_t std_meta) {
+control ingress(inout Header_t h,
+                  inout Meta_t m,
+                  inout standard_metadata_t standard_meta) {
     action a() {
-        std_meta.egress_spec = 9w0;
+        standard_meta.egress_spec = 0;
     }
 
     action a_with_control_params(bit<9> x) {
-        std_meta.egress_spec = x;
+        standard_meta.egress_spec = x;
     }
 
     table t_exact_ternary {
         key = {
-            hdr.h.e: exact;
-            hdr.h.t: ternary;
+            h.h.e: exact;
+            h.h.t: ternary;
         }
         actions = {
             a;
@@ -74,14 +74,14 @@ control MyComputeChecksum(inout Header_t hdr, inout Meta_t meta) {
     apply {}
 }
 
-control deparser(packet_out pkt, in Header_t hdr) {
+control deparser(packet_out b, in Header_t h) {
     apply {
-        pkt.emit(hdr.h);
+        pkt.emit(h.h);
     }
 }
 
 V1Switch(
-    p_(),
+    p(),
     MyVerifyChecksum(),
     ingress(),
     MyEgress(),

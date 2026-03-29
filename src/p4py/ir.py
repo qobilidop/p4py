@@ -197,6 +197,7 @@ class ParserState:
 class ParserDecl:
     name: str
     states: tuple[ParserState, ...]
+    param_names: tuple[str, ...] = ()
 
 
 # --- Actions and Tables ---
@@ -242,6 +243,7 @@ class ControlDecl:
     actions: tuple[ActionDecl, ...]
     tables: tuple[TableDecl, ...]
     apply_body: tuple[Statement, ...]
+    param_names: tuple[str, ...] = ()
 
 
 # --- Deparser ---
@@ -251,6 +253,7 @@ class ControlDecl:
 class DeparserDecl:
     name: str
     emit_order: tuple[FieldAccess, ...]
+    param_names: tuple[str, ...] = ()
 
 
 # --- Package ---

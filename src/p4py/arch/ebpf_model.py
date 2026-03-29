@@ -45,12 +45,18 @@ class EbpfFilterArch(Architecture):
             BlockSpec("filter", "control"),
         )
 
-    def block_signature(self, block_name, struct_names):
-        h = struct_names["headers"]
+    def block_signature(self, block_name, struct_names, param_names=()):
+        ht = struct_names["headers"]
         if block_name == "parser":
-            return f"parser {{name}}(packet_in p, out {h} headers)"
-        # filter
-        return f"control {{name}}(inout {h} headers, out bool pass_)"
+            pkt, h = (
+                param_names if len(param_names) == 2 else ("p", "headers")
+            )
+            return f"parser {{name}}(packet_in {pkt}, out {ht} {h})"
+        # filter: control(inout headers, out bool pass_)
+        h, out = (
+            param_names if len(param_names) == 2 else ("headers", "pass_")
+        )
+        return f"control {{name}}(inout {ht} {h}, out bool {out})"
 
     def main_instantiation(self, block_names):
         return f"ebpfFilter({block_names['parser']}(), {block_names['filter']}()) main;"
@@ -109,5 +115,5 @@ class ebpfFilter:  # noqa: N801
     def __post_init__(self) -> None:
         self.arch: Architecture = _EBPF_ARCH
         if self.parser is not None:
-            annotations = self.parser._p4_annotations
-            self.headers: type[p4.struct] = annotations.get("headers")
+            ann_values = list(self.parser._p4_annotations.values())
+            self.headers: type[p4.struct] = ann_values[0] if ann_values else None

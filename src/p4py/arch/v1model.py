@@ -89,25 +89,40 @@ class V1ModelArch(Architecture):
             BlockSpec("deparser", "deparser"),
         )
 
-    def block_signature(self, block_name, struct_names):
-        h = struct_names["headers"]
-        m = struct_names["metadata"]
+    def block_signature(self, block_name, struct_names, param_names=()):
+        ht = struct_names["headers"]
+        mt = struct_names["metadata"]
         if block_name == "parser":
+            # parser(packet_in, out headers, inout meta, inout standard_metadata_t)
+            pkt, h, m, sm = (
+                param_names if len(param_names) == 4 else ("pkt", "hdr", "meta", "std_meta")
+            )
             return (
-                f"parser {{name}}(packet_in pkt,\n"
-                f"                out {h} hdr,\n"
-                f"                inout {m} meta,\n"
-                f"                inout standard_metadata_t std_meta)"
+                f"parser {{name}}(packet_in {pkt},\n"
+                f"                out {ht} {h},\n"
+                f"                inout {mt} {m},\n"
+                f"                inout standard_metadata_t {sm})"
             )
         if block_name in ("verify_checksum", "compute_checksum"):
-            return f"control {{name}}(inout {h} hdr, inout {m} meta)"
+            # control(inout headers, inout meta)
+            h, m = (
+                param_names if len(param_names) == 2 else ("hdr", "meta")
+            )
+            return f"control {{name}}(inout {ht} {h}, inout {mt} {m})"
         if block_name == "deparser":
-            return f"control {{name}}(packet_out pkt, in {h} hdr)"
-        # ingress, egress
+            # control(packet_out, in headers)
+            pkt, h = (
+                param_names if len(param_names) == 2 else ("pkt", "hdr")
+            )
+            return f"control {{name}}(packet_out {pkt}, in {ht} {h})"
+        # ingress, egress: control(inout headers, inout meta, inout standard_metadata_t)
+        h, m, sm = (
+            param_names if len(param_names) == 3 else ("hdr", "meta", "std_meta")
+        )
         return (
-            f"control {{name}}(inout {h} hdr,\n"
-            f"                  inout {m} meta,\n"
-            f"                  inout standard_metadata_t std_meta)"
+            f"control {{name}}(inout {ht} {h},\n"
+            f"                  inout {mt} {m},\n"
+            f"                  inout standard_metadata_t {sm})"
         )
 
     def main_instantiation(self, block_names):
@@ -237,6 +252,9 @@ class V1Switch:
     def __post_init__(self) -> None:
         self.arch: Architecture = _V1MODEL_ARCH
         if self.parser is not None:
-            annotations = self.parser._p4_annotations
-            self.headers: type[p4.struct] = annotations.get("hdr")
-            self.metadata: type[p4.struct] = annotations.get("meta")
+            # Extract by position: parser(pkt, headers, [metadata], std_meta)
+            ann_values = list(self.parser._p4_annotations.values())
+            self.headers: type[p4.struct] = ann_values[0] if ann_values else None
+            self.metadata: type[p4.struct] = (
+                ann_values[1] if len(ann_values) > 1 else None
+            )

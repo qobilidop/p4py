@@ -28,7 +28,9 @@ def emit(package: ir.Package) -> str:
     for spec in arch.pipeline:
         entry = next((b for b in package.blocks if b.name == spec.name), None)
         if entry is not None:
-            sig = arch.block_signature(entry.name, struct_names)
+            sig = arch.block_signature(
+                entry.name, struct_names, entry.decl.param_names
+            )
             if entry.kind == "parser":
                 _emit_parser_block(lines, entry.decl, sig)
             elif entry.kind == "deparser":

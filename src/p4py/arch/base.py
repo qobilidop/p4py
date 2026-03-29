@@ -36,7 +36,12 @@ class Architecture(ABC):
         """Ordered pipeline block specifications."""
 
     @abstractmethod
-    def block_signature(self, block_name: str, struct_names: dict[str, str]) -> str:
+    def block_signature(
+        self,
+        block_name: str,
+        struct_names: dict[str, str],
+        param_names: tuple[str, ...] = (),
+    ) -> str:
         """Return the P4 signature string for a pipeline block."""
 
     @abstractmethod

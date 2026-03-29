@@ -271,6 +271,11 @@ def _param_names(func_def: ast.FunctionDef) -> set[str]:
     return {arg.arg for arg in func_def.args.args}
 
 
+def _param_names_ordered(func_def: ast.FunctionDef) -> tuple[str, ...]:
+    """Extract parameter names in declaration order."""
+    return tuple(arg.arg for arg in func_def.args.args)
+
+
 def _compile_parser(spec) -> ir.ParserDecl:
     """Compile a @p4.parser spec into a ParserDecl."""
     func_def = _parse_spec_ast(spec)
@@ -279,7 +284,11 @@ def _compile_parser(spec) -> ir.ParserDecl:
     for node in func_def.body:
         if isinstance(node, ast.FunctionDef):
             states.append(_compile_parser_state(node, params))
-    return ir.ParserDecl(name=spec._p4_name, states=tuple(states))
+    return ir.ParserDecl(
+        name=spec._p4_name,
+        states=tuple(states),
+        param_names=_param_names_ordered(func_def),
+    )
 
 
 def _compile_parser_state(
@@ -382,6 +391,7 @@ def _compile_control(spec) -> ir.ControlDecl:
         actions=tuple(actions),
         tables=tuple(tables),
         apply_body=tuple(apply_body),
+        param_names=_param_names_ordered(func_def),
     )
 
 
@@ -562,4 +572,8 @@ def _compile_deparser(spec) -> ir.DeparserDecl:
                 emit_order.append(arg)
                 continue
         raise ValueError(f"Deparser only supports pkt.emit() calls: {ast.dump(node)}")
-    return ir.DeparserDecl(name=spec._p4_name, emit_order=tuple(emit_order))
+    return ir.DeparserDecl(
+        name=spec._p4_name,
+        emit_order=tuple(emit_order),
+        param_names=_param_names_ordered(func_def),
+    )

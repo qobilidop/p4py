@@ -27,24 +27,24 @@ class Meta_t(p4.struct):
 
 
 @p4.parser
-def p_(pkt, hdr: Header_t, meta: Meta_t, std_meta):
+def p(b, h: Header_t, m: Meta_t, sm):
     def start():
-        pkt.extract(hdr.h)
+        b.extract(h.h)
         return p4.ACCEPT
 
 
 @p4.control
-def ingress(hdr, meta, std_meta):
+def ingress(h, m, standard_meta):
     @p4.action
     def a():
-        std_meta.egress_spec = p4.literal(0, width=9)
+        standard_meta.egress_spec = 0
 
     @p4.action
     def a_with_control_params(x: p4.bit(9)):
-        std_meta.egress_spec = x
+        standard_meta.egress_spec = x
 
     t_exact = p4.table(
-        key={hdr.h.e: p4.exact},
+        key={h.h.e: p4.exact},
         actions=[a, a_with_control_params],
         default_action=a,
         const_entries={
@@ -57,12 +57,12 @@ def ingress(hdr, meta, std_meta):
 
 
 @p4.deparser
-def deparser(pkt, hdr):
-    pkt.emit(hdr.h)
+def deparser(b, h):
+    b.emit(h.h)
 
 
 main = v1model.V1Switch(
-    parser=p_,
+    parser=p,
     ingress=ingress,
     deparser=deparser,
 )
