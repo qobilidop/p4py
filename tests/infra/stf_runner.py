@@ -6,7 +6,6 @@ inputs for the P4Py simulator.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
