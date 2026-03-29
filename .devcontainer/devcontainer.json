@@ -1,11 +1,8 @@
 {
   "name": "p4py",
   "build": {
-    "dockerfile": "Dockerfile",
-    "options": ["--platform=linux/amd64"]
+    "dockerfile": "Dockerfile"
   },
-  "capAdd": ["NET_ADMIN"],
-  "runArgs": ["--cap-add=NET_ADMIN"],
   "remoteUser": "dev",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
   "workspaceFolder": "/workspace",
