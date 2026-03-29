@@ -275,6 +275,16 @@ class TestListExpression(absltest.TestCase):
         self.assertLen(le.elements, 2)
 
 
+class TestCastExpression(absltest.TestCase):
+    def test_cast_expression(self):
+        cast = nodes.Cast(
+            type_name="port_id_t",
+            expr=nodes.FieldAccess(path=("std_meta", "ingress_port")),
+        )
+        self.assertEqual(cast.type_name, "port_id_t")
+        self.assertIsInstance(cast.expr, nodes.FieldAccess)
+
+
 class TestNodesFrozen(absltest.TestCase):
     def test_nodes_are_frozen(self):
         t = nodes.BitType(width=8)

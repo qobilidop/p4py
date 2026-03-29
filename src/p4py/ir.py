@@ -144,6 +144,12 @@ class Wildcard:
     pass
 
 
+@dataclass(frozen=True)
+class Cast:
+    type_name: str
+    expr: Expression
+
+
 Expression = (
     FieldAccess
     | IntLiteral
@@ -153,6 +159,7 @@ Expression = (
     | ListExpression
     | Masked
     | Wildcard
+    | Cast
 )
 
 
