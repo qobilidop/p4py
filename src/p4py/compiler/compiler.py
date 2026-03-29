@@ -113,6 +113,19 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
         return nodes.BoolLiteral(value=node.value)
     if isinstance(node, ast.Constant) and isinstance(node.value, int):
         return nodes.IntLiteral(value=node.value)
+    # p4.literal(value, width=N) → IntLiteral with width
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "literal"
+        and len(node.args) == 1
+    ):
+        value = node.args[0].value
+        width = None
+        for kw in node.keywords:
+            if kw.arg == "width":
+                width = kw.value.value
+        return nodes.IntLiteral(value=value, width=width)
     if isinstance(node, (ast.Attribute, ast.Name)):
         return _ast_to_field_access(node)
     if isinstance(node, ast.BinOp):
@@ -397,6 +410,7 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
     actions = ()
     default_action = ""
     default_action_args: tuple[nodes.Expression, ...] = ()
+    size = None
 
     for kw in call.keywords:
         if kw.arg == "key":
@@ -411,6 +425,12 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
                 default_action_args = tuple(
                     _ast_to_expression(a) for a in kw.value.args
                 )
+        elif (
+            kw.arg == "size"
+            and isinstance(kw.value, ast.Constant)
+            and isinstance(kw.value.value, int)
+        ):
+            size = kw.value.value
 
     return nodes.TableDecl(
         name=name,
@@ -418,6 +438,7 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
         actions=actions,
         default_action=default_action,
         default_action_args=default_action_args,
+        size=size,
     )
 
 

@@ -51,6 +51,7 @@ class FieldAccess:
 @dataclass(frozen=True)
 class IntLiteral:
     value: int
+    width: int | None = None
 
 
 @dataclass(frozen=True)
@@ -216,6 +217,7 @@ class TableDecl:
     actions: tuple[str, ...]
     default_action: str
     default_action_args: tuple[Expression, ...]
+    size: int | None = None
 
 
 # --- Control ---

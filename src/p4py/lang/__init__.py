@@ -18,6 +18,7 @@ from p4py.lang._types import (
     bit,
     exact,
     header,
+    literal,
     lpm,
     struct,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "deparser",
     "exact",
     "header",
+    "literal",
     "lpm",
     "parser",
     "struct",

@@ -22,24 +22,24 @@ header ipv4_t {
     bit<32> dstAddr;
 }
 
-struct headers_t {
+struct headers {
     ethernet_t ethernet;
     ipv4_t ipv4;
 }
 
-struct ingress_metadata_t {
+struct ingress_metadata {
     bit<12> vrf;
     bit<16> bd;
     bit<16> nexthop_index;
 }
 
-struct metadata_t {
-    ingress_metadata_t ingress_metadata;
+struct metadata {
+    ingress_metadata ingress_metadata;
 }
 
 parser ParserImpl(packet_in pkt,
-                out headers_t hdr,
-                inout metadata_t meta,
+                out headers hdr,
+                inout metadata meta,
                 inout standard_metadata_t std_meta) {
     state start {
         transition parse_ethernet;
@@ -57,7 +57,7 @@ parser ParserImpl(packet_in pkt,
     }
 }
 
-control verifyChecksum(inout headers_t hdr, inout metadata_t meta) {
+control verifyChecksum(inout headers hdr, inout metadata meta) {
     apply {
         verify_checksum(
             true,
@@ -67,8 +67,8 @@ control verifyChecksum(inout headers_t hdr, inout metadata_t meta) {
     }
 }
 
-control ingress(inout headers_t hdr,
-                  inout metadata_t meta,
+control ingress(inout headers hdr,
+                  inout metadata meta,
                   inout standard_metadata_t std_meta) {
     action on_miss() {
     }
@@ -83,7 +83,7 @@ control ingress(inout headers_t hdr,
 
     action fib_hit_nexthop(bit<16> nexthop_index) {
         meta.ingress_metadata.nexthop_index = nexthop_index;
-        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+        hdr.ipv4.ttl = hdr.ipv4.ttl - 8w1;
     }
 
     action set_egress_details(bit<9> egress_spec) {
@@ -97,6 +97,7 @@ control ingress(inout headers_t hdr,
         actions = {
             set_bd;
         }
+        size = 32768;
     }
 
     table bd {
@@ -106,6 +107,7 @@ control ingress(inout headers_t hdr,
         actions = {
             set_vrf;
         }
+        size = 65536;
     }
 
     table ipv4_fib {
@@ -118,6 +120,7 @@ control ingress(inout headers_t hdr,
             fib_hit_nexthop;
         }
         default_action = on_miss();
+        size = 131072;
     }
 
     table ipv4_fib_lpm {
@@ -130,6 +133,7 @@ control ingress(inout headers_t hdr,
             fib_hit_nexthop;
         }
         default_action = on_miss();
+        size = 16384;
     }
 
     table nexthop {
@@ -141,6 +145,7 @@ control ingress(inout headers_t hdr,
             set_egress_details;
         }
         default_action = on_miss();
+        size = 32768;
     }
 
     apply {
@@ -157,8 +162,8 @@ control ingress(inout headers_t hdr,
     }
 }
 
-control egress(inout headers_t hdr,
-                  inout metadata_t meta,
+control egress(inout headers hdr,
+                  inout metadata meta,
                   inout standard_metadata_t std_meta) {
     action on_miss() {
     }
@@ -177,6 +182,7 @@ control egress(inout headers_t hdr,
             rewrite_src_dst_mac;
         }
         default_action = on_miss();
+        size = 32768;
     }
 
     apply {
@@ -184,7 +190,7 @@ control egress(inout headers_t hdr,
     }
 }
 
-control computeChecksum(inout headers_t hdr, inout metadata_t meta) {
+control computeChecksum(inout headers hdr, inout metadata meta) {
     apply {
         update_checksum(
             true,
@@ -194,7 +200,7 @@ control computeChecksum(inout headers_t hdr, inout metadata_t meta) {
     }
 }
 
-control DeparserImpl(packet_out pkt, in headers_t hdr) {
+control DeparserImpl(packet_out pkt, in headers hdr) {
     apply {
         pkt.emit(hdr.ethernet);
         pkt.emit(hdr.ipv4);

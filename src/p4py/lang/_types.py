@@ -107,5 +107,11 @@ class _MatchKind:
 exact = _MatchKind("exact")
 lpm = _MatchKind("lpm")
 
+
+def literal(value: int, *, width: int) -> int:
+    """Width-annotated integer literal. Emits as ``<width>w<value>`` in P4."""
+    return value
+
+
 ACCEPT = "accept"
 REJECT = "reject"

@@ -6,11 +6,20 @@ Generates boilerplate for unused v1model pipeline stages.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from p4py.ir import nodes
 
 
 def emit(program: nodes.Program) -> str:
     """Emit a P4-16 source string from an IR Program."""
+    # Derive the headers and metadata struct names from the program.
+    # Convention: the first struct with header-typed members is headers,
+    # the last struct is metadata.
+    headers_name = program.structs[0].name
+    metadata_name = program.structs[-1].name
+    names = _StructNames(headers=headers_name, metadata=metadata_name)
+
     lines: list[str] = []
     lines.append("#include <core.p4>")
     lines.append("#include <v1model.p4>")
@@ -21,15 +30,21 @@ def emit(program: nodes.Program) -> str:
     for s in program.structs:
         _emit_struct(lines, s)
 
-    _emit_parser(lines, program.parser)
-    _emit_verify_checksum(lines, program.verify_checksum)
-    _emit_control(lines, program.ingress)
-    _emit_egress(lines, program.egress)
-    _emit_compute_checksum(lines, program.compute_checksum)
-    _emit_deparser(lines, program.deparser)
+    _emit_parser(lines, program.parser, names)
+    _emit_verify_checksum(lines, program.verify_checksum, names)
+    _emit_control(lines, program.ingress, names)
+    _emit_egress(lines, program.egress, names)
+    _emit_compute_checksum(lines, program.compute_checksum, names)
+    _emit_deparser(lines, program.deparser, names)
     _emit_main(lines, program)
 
     return "\n".join(lines) + "\n"
+
+
+@dataclass
+class _StructNames:
+    headers: str
+    metadata: str
 
 
 def _emit_header(lines: list[str], h: nodes.HeaderType) -> None:
@@ -51,10 +66,10 @@ def _emit_struct(lines: list[str], s: nodes.StructType) -> None:
     lines.append("")
 
 
-def _emit_parser(lines: list[str], p: nodes.ParserDecl) -> None:
+def _emit_parser(lines: list[str], p: nodes.ParserDecl, names: _StructNames) -> None:
     lines.append(f"parser {p.name}(packet_in pkt,")
-    lines.append("                out headers_t hdr,")
-    lines.append("                inout metadata_t meta,")
+    lines.append(f"                out {names.headers} hdr,")
+    lines.append(f"                inout {names.metadata} meta,")
     lines.append("                inout standard_metadata_t std_meta) {")
     for state in p.states:
         _emit_parser_state(lines, state)
@@ -82,9 +97,9 @@ def _emit_parser_state(lines: list[str], state: nodes.ParserState) -> None:
     lines.append("    }")
 
 
-def _emit_control(lines: list[str], c: nodes.ControlDecl) -> None:
-    lines.append(f"control {c.name}(inout headers_t hdr,")
-    lines.append("                  inout metadata_t meta,")
+def _emit_control(lines: list[str], c: nodes.ControlDecl, names: _StructNames) -> None:
+    lines.append(f"control {c.name}(inout {names.headers} hdr,")
+    lines.append(f"                  inout {names.metadata} meta,")
     lines.append("                  inout standard_metadata_t std_meta) {")
 
     for action in c.actions:
@@ -125,12 +140,16 @@ def _emit_table(lines: list[str], t: nodes.TableDecl) -> None:
             lines.append(f"        default_action = {t.default_action}({args});")
         else:
             lines.append(f"        default_action = {t.default_action}();")
+    if t.size is not None:
+        lines.append(f"        size = {t.size};")
     lines.append("    }")
     lines.append("")
 
 
-def _emit_deparser(lines: list[str], d: nodes.DeparserDecl) -> None:
-    lines.append(f"control {d.name}(packet_out pkt, in headers_t hdr) {{")
+def _emit_deparser(
+    lines: list[str], d: nodes.DeparserDecl, names: _StructNames
+) -> None:
+    lines.append(f"control {d.name}(packet_out pkt, in {names.headers} hdr) {{")
     lines.append("    apply {")
     for field in d.emit_order:
         lines.append(f"        pkt.emit({_emit_field_access(field)});")
@@ -139,44 +158,56 @@ def _emit_deparser(lines: list[str], d: nodes.DeparserDecl) -> None:
     lines.append("")
 
 
-def _emit_verify_checksum(lines: list[str], vc: nodes.ControlDecl | None) -> None:
+def _emit_verify_checksum(
+    lines: list[str], vc: nodes.ControlDecl | None, names: _StructNames
+) -> None:
     if vc is not None:
-        _emit_checksum_control(lines, vc)
+        _emit_checksum_control(lines, vc, names)
     else:
         lines.append(
-            "control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {"
+            f"control MyVerifyChecksum(inout {names.headers} hdr,"
+            f" inout {names.metadata} meta) {{"
         )
         lines.append("    apply {}")
         lines.append("}")
         lines.append("")
 
 
-def _emit_egress(lines: list[str], egress: nodes.ControlDecl | None) -> None:
+def _emit_egress(
+    lines: list[str], egress: nodes.ControlDecl | None, names: _StructNames
+) -> None:
     if egress is not None:
-        _emit_control(lines, egress)
+        _emit_control(lines, egress, names)
     else:
-        lines.append("control MyEgress(inout headers_t hdr,")
-        lines.append("                  inout metadata_t meta,")
+        lines.append(f"control MyEgress(inout {names.headers} hdr,")
+        lines.append(f"                  inout {names.metadata} meta,")
         lines.append("                  inout standard_metadata_t std_meta) {")
         lines.append("    apply {}")
         lines.append("}")
         lines.append("")
 
 
-def _emit_compute_checksum(lines: list[str], cc: nodes.ControlDecl | None) -> None:
+def _emit_compute_checksum(
+    lines: list[str], cc: nodes.ControlDecl | None, names: _StructNames
+) -> None:
     if cc is not None:
-        _emit_checksum_control(lines, cc)
+        _emit_checksum_control(lines, cc, names)
     else:
         lines.append(
-            "control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {"
+            f"control MyComputeChecksum(inout {names.headers} hdr,"
+            f" inout {names.metadata} meta) {{"
         )
         lines.append("    apply {}")
         lines.append("}")
         lines.append("")
 
 
-def _emit_checksum_control(lines: list[str], c: nodes.ControlDecl) -> None:
-    lines.append(f"control {c.name}(inout headers_t hdr, inout metadata_t meta) {{")
+def _emit_checksum_control(
+    lines: list[str], c: nodes.ControlDecl, names: _StructNames
+) -> None:
+    lines.append(
+        f"control {c.name}(inout {names.headers} hdr, inout {names.metadata} meta) {{"
+    )
     lines.append("    apply {")
     for stmt in c.apply_body:
         _emit_checksum_statement(lines, stmt)
@@ -279,6 +310,8 @@ def _emit_expression(expr: nodes.Expression) -> str:
     if isinstance(expr, nodes.BoolLiteral):
         return "true" if expr.value else "false"
     if isinstance(expr, nodes.IntLiteral):
+        if expr.width is not None:
+            return f"{expr.width}w{expr.value}"
         return str(expr.value)
     if isinstance(expr, nodes.ArithOp):
         return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"

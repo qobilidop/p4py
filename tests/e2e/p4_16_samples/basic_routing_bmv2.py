@@ -31,23 +31,23 @@ class ipv4_t(p4.header):
     dstAddr: p4.bit(32)
 
 
-class headers_t(p4.struct):
+class headers(p4.struct):
     ethernet: ethernet_t
     ipv4: ipv4_t
 
 
-class ingress_metadata_t(p4.struct):
+class ingress_metadata(p4.struct):
     vrf: p4.bit(12)
     bd: p4.bit(16)
     nexthop_index: p4.bit(16)
 
 
-class metadata_t(p4.struct):
-    ingress_metadata: ingress_metadata_t
+class metadata(p4.struct):
+    ingress_metadata: ingress_metadata
 
 
 @p4.parser
-def ParserImpl(pkt, hdr: headers_t, meta: metadata_t, std_meta):
+def ParserImpl(pkt, hdr: headers, meta: metadata, std_meta):
     def start():
         return parse_ethernet
 
@@ -79,6 +79,7 @@ def egress(hdr, meta, std_meta):
         key={meta.ingress_metadata.nexthop_index: p4.exact},
         actions=[on_miss, rewrite_src_dst_mac],
         default_action=on_miss,
+        size=32768,
     )
 
     rewrite_mac.apply()
@@ -101,17 +102,19 @@ def ingress(hdr, meta, std_meta):
     port_mapping = p4.table(
         key={std_meta.ingress_port: p4.exact},
         actions=[set_bd],
+        size=32768,
     )
 
     bd = p4.table(
         key={meta.ingress_metadata.bd: p4.exact},
         actions=[set_vrf],
+        size=65536,
     )
 
     @p4.action
     def fib_hit_nexthop(nexthop_index: p4.bit(16)):
         meta.ingress_metadata.nexthop_index = nexthop_index
-        hdr.ipv4.ttl = hdr.ipv4.ttl - 1
+        hdr.ipv4.ttl = hdr.ipv4.ttl - p4.literal(1, width=8)
 
     ipv4_fib = p4.table(
         key={
@@ -120,6 +123,7 @@ def ingress(hdr, meta, std_meta):
         },
         actions=[on_miss, fib_hit_nexthop],
         default_action=on_miss,
+        size=131072,
     )
 
     ipv4_fib_lpm = p4.table(
@@ -129,6 +133,7 @@ def ingress(hdr, meta, std_meta):
         },
         actions=[on_miss, fib_hit_nexthop],
         default_action=on_miss,
+        size=16384,
     )
 
     @p4.action
@@ -139,6 +144,7 @@ def ingress(hdr, meta, std_meta):
         key={meta.ingress_metadata.nexthop_index: p4.exact},
         actions=[on_miss, set_egress_details],
         default_action=on_miss,
+        size=32768,
     )
 
     if hdr.ipv4.isValid():
