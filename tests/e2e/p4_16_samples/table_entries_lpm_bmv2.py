@@ -48,7 +48,7 @@ def ingress(hdr, meta, std_meta):
         actions=[a, a_with_control_params],
         default_action=a,
         const_entries={
-            p4.mask(0x11, 0xF0): a_with_control_params(11),
+            p4.mask(p4.hex(0x11), p4.hex(0xF0)): a_with_control_params(11),
             p4.hex(0x12): a_with_control_params(12),
             None: a_with_control_params(13),
         },

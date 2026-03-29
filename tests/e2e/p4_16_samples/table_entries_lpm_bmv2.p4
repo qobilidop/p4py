@@ -50,7 +50,7 @@ control ingress(inout Header_t hdr,
             a_with_control_params;
         }
         const entries = {
-            (17 &&& 240) : a_with_control_params(11);
+            (0x11 &&& 0xf0) : a_with_control_params(11);
             (0x12) : a_with_control_params(12);
             (_) : a_with_control_params(13);
         }
