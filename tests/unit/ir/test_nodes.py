@@ -298,6 +298,16 @@ class TestUnaryOp(absltest.TestCase):
         self.assertIsInstance(expr.operand, nodes.FieldAccess)
 
 
+class TestCompareOp(absltest.TestCase):
+    def test_compare_op(self):
+        expr = nodes.CompareOp(
+            op="==",
+            left=nodes.FieldAccess(path=("a",)),
+            right=nodes.IntLiteral(value=0),
+        )
+        self.assertEqual(expr.op, "==")
+
+
 class TestNodesFrozen(absltest.TestCase):
     def test_nodes_are_frozen(self):
         t = nodes.BitType(width=8)

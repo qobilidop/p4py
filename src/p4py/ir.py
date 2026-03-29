@@ -161,6 +161,13 @@ class UnaryOp:
     operand: Expression
 
 
+@dataclass(frozen=True)
+class CompareOp:
+    op: str  # "==" or "!="
+    left: Expression
+    right: Expression
+
+
 Expression = (
     FieldAccess
     | IntLiteral
@@ -173,6 +180,7 @@ Expression = (
     | Cast
     | ConstRef
     | UnaryOp
+    | CompareOp
 )
 
 
