@@ -7,11 +7,21 @@ from __future__ import annotations
 
 import ast
 
+from p4py.arch.ebpf_model import ebpfFilter
 from p4py.arch.v1model import V1Switch
 from p4py.ir import nodes
 
 
-def compile(pipeline: V1Switch) -> nodes.Program:
+def compile(pipeline) -> nodes.Program | nodes.EbpfProgram:
+    """Compile a pipeline into an IR Program."""
+    if isinstance(pipeline, V1Switch):
+        return _compile_v1switch(pipeline)
+    if isinstance(pipeline, ebpfFilter):
+        return _compile_ebpf(pipeline)
+    raise TypeError(f"Unsupported pipeline type: {type(pipeline)}")
+
+
+def _compile_v1switch(pipeline: V1Switch) -> nodes.Program:
     """Compile a V1Switch pipeline into an IR Program."""
     headers_ir = _compile_types(pipeline.headers)
     structs_ir = _compile_structs(pipeline.headers, pipeline.metadata)
@@ -38,6 +48,20 @@ def compile(pipeline: V1Switch) -> nodes.Program:
         egress=egress_ir,
         verify_checksum=verify_ir,
         compute_checksum=compute_ir,
+    )
+
+
+def _compile_ebpf(pipeline: ebpfFilter) -> nodes.EbpfProgram:
+    """Compile an ebpfFilter pipeline into an EbpfProgram."""
+    headers_ir = _compile_types(pipeline.headers)
+    structs_ir = _compile_structs_no_metadata(pipeline.headers)
+    parser_ir = _compile_parser(pipeline.parser)
+    filter_ir = _compile_control(pipeline.filter)
+    return nodes.EbpfProgram(
+        headers=headers_ir,
+        structs=structs_ir,
+        parser=parser_ir,
+        filter=filter_ir,
     )
 
 
@@ -81,6 +105,19 @@ def _compile_structs(
     for s in (headers_struct, metadata_struct):
         _compile_one(s)
     return tuple(result)
+
+
+def _compile_structs_no_metadata(
+    headers_struct: type,
+) -> tuple[nodes.StructType, ...]:
+    """Compile struct types to IR (no metadata struct)."""
+    members = []
+    for name, ann in headers_struct._p4_members:
+        if hasattr(ann, "width"):
+            members.append(nodes.StructMember(name, nodes.BitType(ann.width)))
+        else:
+            members.append(nodes.StructMember(name, ann._p4_name))
+    return (nodes.StructType(name=headers_struct._p4_name, members=tuple(members)),)
 
 
 def _parse_spec_ast(spec) -> ast.FunctionDef:
@@ -370,8 +407,16 @@ def _compile_action(
     action_params = []
     for arg in func_def.args.args:
         if arg.annotation is not None:
-            # p4.bit(W) → BitType
+            # p4.bool → BoolType
             if (
+                isinstance(arg.annotation, ast.Attribute)
+                and arg.annotation.attr == "bool"
+            ):
+                action_params.append(
+                    nodes.ActionParam(name=arg.arg, type=nodes.BoolType())
+                )
+            # p4.bit(W) → BitType
+            elif (
                 isinstance(arg.annotation, ast.Call)
                 and isinstance(arg.annotation.func, ast.Attribute)
                 and arg.annotation.func.attr == "bit"
@@ -382,7 +427,7 @@ def _compile_action(
                 )
             else:
                 raise ValueError(
-                    f"Action param '{arg.arg}' must be annotated with p4.bit(W)"
+                    f"Action param '{arg.arg}' must be annotated with p4.bit(W) or p4.bool"
                 )
 
     body = tuple(
@@ -411,12 +456,22 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
     default_action = ""
     default_action_args: tuple[nodes.Expression, ...] = ()
     size = None
+    const_entries: tuple[nodes.ConstEntry, ...] = ()
+    implementation: str | None = None
 
     for kw in call.keywords:
         if kw.arg == "key":
             keys = _compile_table_keys(kw.value)
         elif kw.arg == "actions":
-            actions = tuple(elt.id for elt in kw.value.elts)
+            action_names = []
+            for elt in kw.value.elts:
+                if isinstance(elt, ast.Name):
+                    action_names.append(elt.id)
+                elif isinstance(elt, ast.Attribute):
+                    action_names.append(elt.attr)
+                else:
+                    raise ValueError(f"Unsupported action ref: {ast.dump(elt)}")
+            actions = tuple(action_names)
         elif kw.arg == "default_action":
             if isinstance(kw.value, ast.Name):
                 default_action = kw.value.id
@@ -431,6 +486,10 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
             and isinstance(kw.value.value, int)
         ):
             size = kw.value.value
+        elif kw.arg == "const_entries":
+            const_entries = _compile_const_entries(kw.value)
+        elif kw.arg == "implementation":
+            implementation = _compile_implementation(kw.value)
 
     return nodes.TableDecl(
         name=name,
@@ -439,6 +498,8 @@ def _compile_table(node: ast.Assign) -> nodes.TableDecl:
         default_action=default_action,
         default_action_args=default_action_args,
         size=size,
+        const_entries=const_entries,
+        implementation=implementation,
     )
 
 
@@ -454,6 +515,44 @@ def _compile_table_keys(dict_node: ast.Dict) -> tuple[nodes.TableKey, ...]:
             raise ValueError(f"Unsupported match kind: {ast.dump(val_node)}")
         keys.append(nodes.TableKey(field=field, match_kind=match_kind))
     return tuple(keys)
+
+
+def _compile_const_entries(
+    dict_node: ast.Dict,
+) -> tuple[nodes.ConstEntry, ...]:
+    """Compile const_entries = {value: action(args), ...} into ConstEntry nodes."""
+    entries = []
+    for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
+        if isinstance(key_node, ast.Constant):
+            values = (_ast_to_expression(key_node),)
+        elif isinstance(key_node, ast.Tuple):
+            values = tuple(_ast_to_expression(elt) for elt in key_node.elts)
+        else:
+            raise ValueError(f"Unsupported const_entries key: {ast.dump(key_node)}")
+
+        if isinstance(val_node, ast.Call) and isinstance(val_node.func, ast.Name):
+            action_name = val_node.func.id
+            action_args = tuple(_ast_to_expression(a) for a in val_node.args)
+        else:
+            raise ValueError(
+                f"Unsupported const_entries value: {ast.dump(val_node)}"
+            )
+        entries.append(
+            nodes.ConstEntry(
+                values=values, action_name=action_name, action_args=action_args
+            )
+        )
+    return tuple(entries)
+
+
+def _compile_implementation(node: ast.expr) -> str:
+    """Compile implementation = hash_table(64) into a string like 'hash_table(64)'."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        name = node.func.attr
+        if node.args and isinstance(node.args[0], ast.Constant):
+            return f"{name}({node.args[0].value})"
+        return name
+    raise ValueError(f"Unsupported implementation: {ast.dump(node)}")
 
 
 # --- Checksum control compilation ---

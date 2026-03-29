@@ -3,6 +3,7 @@
 from absl.testing import absltest
 
 import p4py.lang as p4
+from p4py.arch import ebpf_model
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.compiler import compile
 from p4py.ir import nodes
@@ -337,6 +338,65 @@ class TestCompileProgram(absltest.TestCase):
         inner = next(s for s in program.structs if s.name == "ingress_metadata_t")
         self.assertLen(inner.members, 2)
         self.assertEqual(inner.members[0], nodes.StructMember("vrf", nodes.BitType(12)))
+
+
+class TestCompileEbpf(absltest.TestCase):
+    def test_compile_init_ebpf(self):
+        """Compile a minimal eBPF program to IR."""
+
+        class Ethernet(p4.header):
+            destination: p4.bit(48)
+            source: p4.bit(48)
+            protocol: p4.bit(16)
+
+        class Headers_t(p4.struct):
+            ethernet: Ethernet
+
+        @p4.parser
+        def prs(p, headers: Headers_t):
+            def start():
+                p.extract(headers.ethernet)
+                return p4.ACCEPT
+
+        @p4.control
+        def pipe(headers: Headers_t, accept):
+            @p4.action
+            def match(act: p4.bool):
+                accept = act
+
+            tbl = p4.table(
+                key={headers.ethernet.protocol: p4.exact},
+                actions=[match, p4.NoAction],
+                const_entries={
+                    0x0800: match(True),
+                    0xD000: match(False),
+                },
+                implementation=ebpf_model.hash_table(64),
+            )
+
+            accept = True
+            tbl.apply()
+
+        pipeline = ebpf_model.ebpfFilter(parser=prs, filter=pipe)
+        program = compile(pipeline)
+
+        self.assertIsInstance(program, nodes.EbpfProgram)
+        self.assertEqual(program.parser.name, "prs")
+        self.assertEqual(program.filter.name, "pipe")
+        self.assertEqual(len(program.headers), 1)
+        self.assertEqual(program.headers[0].name, "Ethernet")
+
+        # Check table has const_entries and implementation.
+        self.assertEqual(len(program.filter.tables), 1)
+        tbl = program.filter.tables[0]
+        self.assertEqual(tbl.name, "tbl")
+        self.assertEqual(len(tbl.const_entries), 2)
+        self.assertEqual(tbl.implementation, "hash_table(64)")
+
+        # Check bool param on action.
+        match_action = program.filter.actions[0]
+        self.assertEqual(match_action.name, "match")
+        self.assertIsInstance(match_action.params[0].type, nodes.BoolType)
 
 
 if __name__ == "__main__":
