@@ -326,19 +326,20 @@ def _resolve_field_width(state: _SimState, field: ir.FieldAccess) -> int:
         for hf in header_inst.type_info.fields:
             if hf.name == path[2]:
                 return hf.type.width
-    # meta.field or meta.struct.field
-    if path[0] == "meta" and len(path) >= 2:
+    # param.field or param.struct.field -> try struct resolution then metadata_widths
+    if len(path) >= 2:
         struct_types = {s.name: s for s in state.program.structs}
         remaining = list(path[1:])
         for s in state.program.structs:
             result = _resolve_struct_field_width(s, remaining, struct_types)
             if result is not None:
                 return result
-    # std_meta.field -> look up from metadata_widths
-    if path[0] == "std_meta" and len(path) == 2:
-        field_name = path[1]
-        if field_name in state.metadata_widths:
-            return state.metadata_widths[field_name]
+        # Direct metadata_widths lookup
+        key = ".".join(path[1:])
+        if key in state.metadata_widths:
+            return state.metadata_widths[key]
+        if len(path) == 2 and path[1] in state.metadata_widths:
+            return state.metadata_widths[path[1]]
     raise ValueError(f"Cannot resolve field width: {field}")
 
 
@@ -527,16 +528,15 @@ def _get_field(state: _SimState, fa: ir.FieldAccess, locals_: dict[str, int]) ->
         if path[0] in state.control_locals:
             return state.control_locals[path[0]]
         raise ValueError(f"Unknown local variable: {path[0]}")
-    # std_meta.field -> read from metadata
-    if path[0] == "std_meta":
-        return state.metadata[path[1]]
-    # meta.field or meta.struct.field
-    if path[0] == "meta":
-        key = ".".join(path[1:])
-        return state.metadata[key]
     # 3-element path: struct.header.field
     if len(path) == 3 and path[1] in state.headers:
         return state.headers[path[1]].fields.get(path[2], 0)
+    # param.field or param.struct.field -> metadata lookup
+    key = ".".join(path[1:])
+    if key in state.metadata:
+        return state.metadata[key]
+    if len(path) == 2 and path[1] in state.metadata:
+        return state.metadata[path[1]]
     raise ValueError(f"Cannot read field: {'.'.join(path)}")
 
 
@@ -546,13 +546,15 @@ def _set_field(state: _SimState, fa: ir.FieldAccess, value: int) -> None:
     if len(path) == 1:
         state.control_locals[path[0]] = value
         return
-    if path[0] == "std_meta":
-        state.metadata[path[1]] = value
-    elif path[0] == "meta":
-        key = ".".join(path[1:])
-        state.metadata[key] = value
-    elif len(path) == 3 and path[1] in state.headers:
+    if len(path) == 3 and path[1] in state.headers:
         state.headers[path[1]].fields[path[2]] = value
+        return
+    # param.field or param.struct.field -> metadata lookup
+    key = ".".join(path[1:])
+    if key in state.metadata:
+        state.metadata[key] = value
+    elif len(path) == 2 and path[1] in state.metadata:
+        state.metadata[path[1]] = value
     else:
         raise ValueError(f"Cannot write field: {'.'.join(path)}")
 

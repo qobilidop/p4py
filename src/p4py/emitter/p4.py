@@ -95,10 +95,11 @@ def _emit_control_block(lines: list[str], c: ir.ControlDecl, sig: str) -> None:
 
 def _emit_deparser_block(lines: list[str], d: ir.DeparserDecl, sig: str) -> None:
     sig_line = sig.replace("{name}", d.name)
+    pkt_name = d.param_names[0] if d.param_names else "pkt"
     lines.append(sig_line + " {")
     lines.append("    apply {")
     for field in d.emit_order:
-        lines.append(f"        pkt.emit({_emit_field_access(field)});")
+        lines.append(f"        {pkt_name}.emit({_emit_field_access(field)});")
     lines.append("    }")
     lines.append("}")
     lines.append("")

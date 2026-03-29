@@ -132,22 +132,22 @@ class V1ModelArch(Architecture):
         return "V1Switch(\n" + ",\n".join(names) + "\n) main;"
 
     def emit_boilerplate(self, lines, spec, struct_names):
-        h = struct_names["headers"]
-        m = struct_names["metadata"]
+        ht = struct_names["headers"]
+        mt = struct_names["metadata"]
         if spec.name in ("verify_checksum", "compute_checksum"):
             cap = (
                 "MyVerifyChecksum"
                 if spec.name == "verify_checksum"
                 else "MyComputeChecksum"
             )
-            lines.append(f"control {cap}(inout {h} hdr, inout {m} meta) {{")
+            lines.append(f"control {cap}(inout {ht} h, inout {mt} m) {{")
             lines.append("    apply {}")
             lines.append("}")
             lines.append("")
         elif spec.name == "egress":
-            lines.append(f"control MyEgress(inout {h} hdr,")
-            lines.append(f"                  inout {m} meta,")
-            lines.append("                  inout standard_metadata_t std_meta) {")
+            lines.append(f"control MyEgress(inout {ht} h,")
+            lines.append(f"                  inout {mt} m,")
+            lines.append("                  inout standard_metadata_t sm) {")
             lines.append("    apply {}")
             lines.append("}")
             lines.append("")

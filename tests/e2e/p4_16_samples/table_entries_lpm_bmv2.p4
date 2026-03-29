@@ -26,7 +26,7 @@ parser p(packet_in b,
     }
 }
 
-control MyVerifyChecksum(inout Header_t hdr, inout Meta_t meta) {
+control MyVerifyChecksum(inout Header_t h, inout Meta_t m) {
     apply {}
 }
 
@@ -62,19 +62,19 @@ control ingress(inout Header_t h,
     }
 }
 
-control MyEgress(inout Header_t hdr,
-                  inout Meta_t meta,
-                  inout standard_metadata_t std_meta) {
+control MyEgress(inout Header_t h,
+                  inout Meta_t m,
+                  inout standard_metadata_t sm) {
     apply {}
 }
 
-control MyComputeChecksum(inout Header_t hdr, inout Meta_t meta) {
+control MyComputeChecksum(inout Header_t h, inout Meta_t m) {
     apply {}
 }
 
 control deparser(packet_out b, in Header_t h) {
     apply {
-        pkt.emit(h.h);
+        b.emit(h.h);
     }
 }
 
