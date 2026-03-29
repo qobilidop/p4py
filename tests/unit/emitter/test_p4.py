@@ -3,11 +3,11 @@
 from absl.testing import absltest
 
 import p4py.lang as p4
+from p4py import ir
 from p4py.arch import ebpf_model
 from p4py.arch.ebpf_model import ebpfFilter
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.compiler import compile
-from p4py import ir
 from p4py.emitter import p4 as p4_emitter
 from p4py.emitter.p4 import emit
 
