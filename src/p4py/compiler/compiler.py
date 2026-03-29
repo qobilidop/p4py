@@ -163,6 +163,14 @@ def _ast_to_expression(node: ast.expr) -> nodes.Expression:
             if kw.arg == "width":
                 width = kw.value.value
         return nodes.IntLiteral(value=value, width=width)
+    # p4.hex(value) → IntLiteral with hex=True
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "hex"
+        and len(node.args) == 1
+    ):
+        return nodes.IntLiteral(value=node.args[0].value, hex=True)
     if isinstance(node, (ast.Attribute, ast.Name)):
         return _ast_to_field_access(node)
     if isinstance(node, ast.BinOp):
@@ -523,12 +531,10 @@ def _compile_const_entries(
     """Compile const_entries = {value: action(args), ...} into ConstEntry nodes."""
     entries = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
-        if isinstance(key_node, ast.Constant):
-            values = (_ast_to_expression(key_node),)
-        elif isinstance(key_node, ast.Tuple):
+        if isinstance(key_node, ast.Tuple):
             values = tuple(_ast_to_expression(elt) for elt in key_node.elts)
         else:
-            raise ValueError(f"Unsupported const_entries key: {ast.dump(key_node)}")
+            values = (_ast_to_expression(key_node),)
 
         if isinstance(val_node, ast.Call) and isinstance(val_node.func, ast.Name):
             action_name = val_node.func.id

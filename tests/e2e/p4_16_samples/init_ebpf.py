@@ -28,22 +28,22 @@ def prs(p, headers: Headers_t):
 
 
 @p4.control
-def pipe(headers: Headers_t, accept):
+def pipe(headers: Headers_t, pass_):
     @p4.action
     def match(act: p4.bool):
-        accept = act
+        pass_ = act
 
     tbl = p4.table(
         key={headers.ethernet.protocol: p4.exact},
         actions=[match, p4.NoAction],
         const_entries={
-            0x0800: match(True),
-            0xD000: match(False),
+            p4.hex(0x0800): match(True),
+            p4.hex(0xD000): match(False),
         },
         implementation=ebpf_model.hash_table(64),
     )
 
-    accept = True
+    pass_ = True
     tbl.apply()
 
 

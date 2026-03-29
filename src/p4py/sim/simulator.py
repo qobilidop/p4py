@@ -155,11 +155,15 @@ def _simulate_ebpf(
     if not any_valid:
         return SimResult(packet=None, egress_port=-1, dropped=True)
 
-    # Run filter control with `accept` as a control-local.
-    state.control_locals["accept"] = 0  # default false
+    # Run filter control. The control output parameter (e.g. pass_)
+    # is tracked as a control-local, set by assignments in the apply body.
     _run_control(state, program.filter, table_entries)
 
-    if state.control_locals.get("accept", 0):
+    # The eBPF filter output is the last-assigned single-name control local.
+    # By convention this is the second parameter of the control (the bool output).
+    # Check if any control local is truthy (there's only one: the accept/pass output).
+    accepted = any(v for v in state.control_locals.values())
+    if accepted:
         return SimResult(packet=bytes(packet), egress_port=0, dropped=False)
     else:
         return SimResult(packet=None, egress_port=-1, dropped=True)

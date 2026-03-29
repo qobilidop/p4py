@@ -83,7 +83,7 @@ def _emit_ebpf_control(
     lines: list[str], c: nodes.ControlDecl, headers_name: str
 ) -> None:
     lines.append(
-        f"control {c.name}(inout {headers_name} headers, out bool accept) {{"
+        f"control {c.name}(inout {headers_name} headers, out bool pass_) {{"
     )
 
     for action in c.actions:
@@ -393,6 +393,8 @@ def _emit_expression(expr: nodes.Expression) -> str:
     if isinstance(expr, nodes.IntLiteral):
         if expr.width is not None:
             return f"{expr.width}w{expr.value}"
+        if expr.hex:
+            return _emit_hex_literal(expr.value)
         return str(expr.value)
     if isinstance(expr, nodes.ArithOp):
         return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
@@ -404,6 +406,14 @@ def _emit_expression(expr: nodes.Expression) -> str:
 def _emit_field_access(fa: nodes.FieldAccess) -> str:
     """Emit a dotted field path."""
     return ".".join(fa.path)
+
+
+def _emit_hex_literal(value: int) -> str:
+    """Emit an integer as a hex literal, padded to even nibbles."""
+    digits = f"{value:x}"
+    if len(digits) % 2:
+        digits = "0" + digits
+    return "0x" + digits
 
 
 def _emit_int_literal(value: int) -> str:

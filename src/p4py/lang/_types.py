@@ -144,5 +144,10 @@ def literal(value: int, *, width: int) -> int:
     return value
 
 
+def hex(value: int) -> int:
+    """Hex-formatted integer literal. Emits as ``0x...`` in P4."""
+    return value
+
+
 ACCEPT = "accept"
 REJECT = "reject"

@@ -57,6 +57,7 @@ class FieldAccess:
 class IntLiteral:
     value: int
     width: int | None = None
+    hex: bool = False
 
 
 @dataclass(frozen=True)

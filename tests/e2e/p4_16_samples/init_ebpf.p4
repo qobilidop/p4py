@@ -18,9 +18,9 @@ parser prs(packet_in p, out Headers_t headers) {
     }
 }
 
-control pipe(inout Headers_t headers, out bool accept) {
+control pipe(inout Headers_t headers, out bool pass_) {
     action match(bool act) {
-        accept = act;
+        pass_ = act;
     }
 
     table tbl {
@@ -32,14 +32,14 @@ control pipe(inout Headers_t headers, out bool accept) {
             NoAction;
         }
         const entries = {
-            (2048) : match(true);
-            (53248) : match(false);
+            (0x0800) : match(true);
+            (0xd000) : match(false);
         }
         implementation = hash_table(64);
     }
 
     apply {
-        accept = true;
+        pass_ = true;
         tbl.apply();
     }
 }
