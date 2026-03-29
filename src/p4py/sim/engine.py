@@ -459,6 +459,12 @@ def _exec_statement(
                 _set_field(state, stmt.args[0], 0)
         elif stmt.method == "apply":
             pass  # Control apply: no-op in simulation (handled at pipeline level)
+        elif stmt.method == "setValid":
+            header_name = stmt.object.path[-1]
+            state.headers[header_name].valid = True
+        elif stmt.method == "setInvalid":
+            header_name = stmt.object.path[-1]
+            state.headers[header_name].valid = False
         else:
             raise ValueError(f"Unknown method: {stmt.method}")
     elif isinstance(stmt, ir.FunctionCall):
@@ -587,6 +593,28 @@ def _eval_expression(
             if isinstance(decl, ir.ConstDecl) and decl.name == expr.name:
                 return decl.value
         raise ValueError(f"Unknown constant: {expr.name}")
+    if isinstance(expr, ir.UnaryOp):
+        val = _eval_expression(state, expr.operand, locals_)
+        if expr.op == "!":
+            return int(not val)
+        raise ValueError(f"Unknown unary op: {expr.op}")
+    if isinstance(expr, ir.CompareOp):
+        left = _eval_expression(state, expr.left, locals_)
+        right = _eval_expression(state, expr.right, locals_)
+        if expr.op == "==":
+            return int(left == right)
+        if expr.op == "!=":
+            return int(left != right)
+        raise ValueError(f"Unknown compare op: {expr.op}")
+    if isinstance(expr, ir.LogicalOp):
+        left = _eval_expression(state, expr.left, locals_)
+        if expr.op == "&&":
+            return int(
+                bool(left) and bool(_eval_expression(state, expr.right, locals_))
+            )
+        if expr.op == "||":
+            return int(bool(left) or bool(_eval_expression(state, expr.right, locals_)))
+        raise ValueError(f"Unknown logical op: {expr.op}")
     raise ValueError(f"Cannot evaluate: {expr}")
 
 

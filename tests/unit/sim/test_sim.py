@@ -730,6 +730,132 @@ class TestCastAndConstRef(absltest.TestCase):
         result = _eval_expression(state, ref_expr, {})
         self.assertEqual(result, 42)
 
+    def test_eval_unary_not_true(self):
+        """UnaryOp('!') on truthy value returns 0."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        expr = ir.UnaryOp(op="!", operand=ir.IntLiteral(value=1))
+        self.assertEqual(_eval_expression(state, expr, {}), 0)
+
+    def test_eval_unary_not_false(self):
+        """UnaryOp('!') on falsy value returns 1."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        expr = ir.UnaryOp(op="!", operand=ir.IntLiteral(value=0))
+        self.assertEqual(_eval_expression(state, expr, {}), 1)
+
+    def test_eval_compare_eq(self):
+        """CompareOp('==') returns 1 when equal, 0 otherwise."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        eq_true = ir.CompareOp(
+            op="==", left=ir.IntLiteral(value=5), right=ir.IntLiteral(value=5)
+        )
+        self.assertEqual(_eval_expression(state, eq_true, {}), 1)
+        eq_false = ir.CompareOp(
+            op="==", left=ir.IntLiteral(value=5), right=ir.IntLiteral(value=3)
+        )
+        self.assertEqual(_eval_expression(state, eq_false, {}), 0)
+
+    def test_eval_compare_neq(self):
+        """CompareOp('!=') returns 1 when not equal, 0 otherwise."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        neq_true = ir.CompareOp(
+            op="!=", left=ir.IntLiteral(value=5), right=ir.IntLiteral(value=3)
+        )
+        self.assertEqual(_eval_expression(state, neq_true, {}), 1)
+        neq_false = ir.CompareOp(
+            op="!=", left=ir.IntLiteral(value=5), right=ir.IntLiteral(value=5)
+        )
+        self.assertEqual(_eval_expression(state, neq_false, {}), 0)
+
+    def test_eval_logical_and(self):
+        """LogicalOp('&&') short-circuits correctly."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        both_true = ir.LogicalOp(
+            op="&&", left=ir.IntLiteral(value=1), right=ir.IntLiteral(value=1)
+        )
+        self.assertEqual(_eval_expression(state, both_true, {}), 1)
+        left_false = ir.LogicalOp(
+            op="&&", left=ir.IntLiteral(value=0), right=ir.IntLiteral(value=1)
+        )
+        self.assertEqual(_eval_expression(state, left_false, {}), 0)
+
+    def test_eval_logical_or(self):
+        """LogicalOp('||') short-circuits correctly."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        left_true = ir.LogicalOp(
+            op="||", left=ir.IntLiteral(value=1), right=ir.IntLiteral(value=0)
+        )
+        self.assertEqual(_eval_expression(state, left_true, {}), 1)
+        both_false = ir.LogicalOp(
+            op="||", left=ir.IntLiteral(value=0), right=ir.IntLiteral(value=0)
+        )
+        self.assertEqual(_eval_expression(state, both_false, {}), 0)
+
     def test_const_ref_unknown_raises(self):
         """ConstRef for unknown constant raises ValueError."""
         from p4py import ir
@@ -785,6 +911,58 @@ class TestCastAndConstRef(absltest.TestCase):
         )
         self.assertEqual(_match_select(state, cases, 0x0800), "parse_ipv4")
         self.assertEqual(_match_select(state, cases, 0x0806), "accept")
+
+
+class TestSetValidInvalid(absltest.TestCase):
+    def test_set_valid(self):
+        """setValid() marks a header as valid."""
+        from p4py import ir
+        from p4py.sim.engine import _exec_statement, _HeaderInstance, _SimState
+
+        eth_type = ir.HeaderType(
+            name="ethernet_t",
+            fields=(ir.HeaderField("dstAddr", ir.BitType(48)),),
+        )
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={"ethernet": _HeaderInstance(type_info=eth_type, valid=False)},
+            metadata={},
+            metadata_widths={},
+            program=None,
+        )
+        stmt = ir.MethodCall(
+            object=ir.FieldAccess(path=("hdr", "ethernet")),
+            method="setValid",
+            args=(),
+        )
+        _exec_statement(state, stmt, {}, {})
+        self.assertTrue(state.headers["ethernet"].valid)
+
+    def test_set_invalid(self):
+        """setInvalid() marks a header as invalid."""
+        from p4py import ir
+        from p4py.sim.engine import _exec_statement, _HeaderInstance, _SimState
+
+        eth_type = ir.HeaderType(
+            name="ethernet_t",
+            fields=(ir.HeaderField("dstAddr", ir.BitType(48)),),
+        )
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={"ethernet": _HeaderInstance(type_info=eth_type, valid=True)},
+            metadata={},
+            metadata_widths={},
+            program=None,
+        )
+        stmt = ir.MethodCall(
+            object=ir.FieldAccess(path=("hdr", "ethernet")),
+            method="setInvalid",
+            args=(),
+        )
+        _exec_statement(state, stmt, {}, {})
+        self.assertFalse(state.headers["ethernet"].valid)
 
 
 if __name__ == "__main__":
