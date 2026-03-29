@@ -59,7 +59,37 @@ class EbpfFilterArch(Architecture):
         pass  # All blocks required; no boilerplate needed.
 
     def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
-        raise NotImplementedError("Implemented in Task 8")
+        from p4py.sim.simulator import SimResult
+
+        eng = engine_cls(package, packet, table_entries)
+
+        parser = _get_block(package, "parser")
+        terminal = eng.run_parser(parser)
+        if terminal == "reject":
+            return SimResult(packet=None, egress_port=-1, dropped=True)
+
+        # eBPF: if no headers were successfully extracted, drop.
+        any_valid = any(h.valid for h in eng.state.headers.values())
+        if not any_valid:
+            return SimResult(packet=None, egress_port=-1, dropped=True)
+
+        # Run filter control.
+        filt = _get_block(package, "filter")
+        eng.run_control(filt)
+
+        # Check if any control local is truthy (the accept/pass output).
+        accepted = any(v for v in eng.state.control_locals.values())
+        if accepted:
+            return SimResult(packet=bytes(packet), egress_port=0, dropped=False)
+        return SimResult(packet=None, egress_port=-1, dropped=True)
+
+
+def _get_block(package, name):
+    """Look up a block by name in a Package."""
+    for entry in package.blocks:
+        if entry.name == name:
+            return entry.decl
+    return None
 
 
 _EBPF_ARCH = EbpfFilterArch()
