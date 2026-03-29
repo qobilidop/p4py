@@ -104,3 +104,22 @@ p4testgen_test(
     p4_library = ":table_entries_ternary_bmv2",
     p4_module = "tests.e2e.p4_16_samples.table_entries_ternary_bmv2",
 )
+
+py_library(
+    name = "table_entries_exact_ternary_bmv2",
+    srcs = ["table_entries_exact_ternary_bmv2.py"],
+    deps = ["//src/p4py"],
+)
+
+golden_test(
+    name = "table_entries_exact_ternary_bmv2_golden_test",
+    golden_file = "table_entries_exact_ternary_bmv2.p4",
+    p4_library = ":table_entries_exact_ternary_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.table_entries_exact_ternary_bmv2",
+)
+
+p4testgen_test(
+    name = "table_entries_exact_ternary_bmv2_p4testgen_test",
+    p4_library = ":table_entries_exact_ternary_bmv2",
+    p4_module = "tests.e2e.p4_16_samples.table_entries_exact_ternary_bmv2",
+)
