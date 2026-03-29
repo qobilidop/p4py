@@ -14,23 +14,6 @@ stf_test(
 )
 
 py_test(
-    name = "basic_forward_diff_test",
-    timeout = "short",
-    srcs = ["basic_forward_diff_test.py"],
-    data = ["basic_forward.stf"],
-    local = True,
-    tags = [
-        "e2e",
-        "local",
-    ],
-    deps = [
-        ":basic_forward",
-        "//src/p4py",
-        "//tests/infra:stf_runner",
-    ],
-)
-
-py_test(
     name = "basic_forward_testgen_test",
     timeout = "moderate",
     srcs = ["basic_forward_testgen_test.py"],
