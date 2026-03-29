@@ -1,0 +1,38 @@
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("//tests/infra:stf_test.bzl", "stf_test")
+
+py_library(
+    name = "basic_routing_bmv2",
+    srcs = ["basic_routing_bmv2.py"],
+    deps = ["//src/p4py"],
+)
+
+stf_test(
+    name = "basic_routing_bmv2_stf_test",
+    p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2.basic_routing_bmv2",
+    p4_library = ":basic_routing_bmv2",
+    stf_file = "basic_routing_bmv2.stf",
+)
+
+py_test(
+    name = "basic_routing_bmv2_golden_test",
+    srcs = ["basic_routing_bmv2_golden_test.py"],
+    data = ["basic_routing_bmv2.p4"],
+    tags = ["e2e"],
+    deps = [
+        ":basic_routing_bmv2",
+        "//src/p4py",
+    ],
+)
+
+py_test(
+    name = "basic_routing_bmv2_testgen_test",
+    timeout = "moderate",
+    srcs = ["basic_routing_bmv2_testgen_test.py"],
+    tags = ["e2e"],
+    deps = [
+        ":basic_routing_bmv2",
+        "//src/p4py",
+        "//tests/infra:stf_runner",
+    ],
+)
