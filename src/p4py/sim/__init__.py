@@ -29,6 +29,3 @@ def simulate(
     return program.arch.process_packet(
         program, SimEngine, packet, ingress_port, table_entries
     )
-
-
-__all__ = ["SimResult", "simulate"]

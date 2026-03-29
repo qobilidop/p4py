@@ -33,8 +33,7 @@ a bug — it ensures user code maps cleanly to P4 constructs.
 In-memory representation of P4 programs as Python data structures. Node types
 correspond to P4 constructs: headers, parsers, tables, actions, controls, and
 programs. All validation and transformation operates on this representation.
-Language profiles (P4Mini, P4Lite) constrain which node types and features are
-valid.
+Language profiles constrain which node types and features are valid.
 
 ### Decorator API (Python to AST)
 
@@ -61,4 +60,4 @@ v1model stages. Output can be compiled by `p4c` and run on BMv2.
 
 Python-defined P4 externs with an extern registry. The simulator calls the
 Python implementation directly. The P4 emitter generates `extern` declarations.
-Scoped to P4Lite.
+Scoped to future work.

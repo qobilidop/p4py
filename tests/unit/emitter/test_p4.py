@@ -1,4 +1,4 @@
-"""Tests for the P4-16 backend."""
+"""Tests for the P4-16 emitter."""
 
 from absl.testing import absltest
 

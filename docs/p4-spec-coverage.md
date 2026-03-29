@@ -2,7 +2,7 @@
 
 What [P4-16 language spec][spec] constructs P4Py currently supports.
 
-P4Py targets **v1model** on a minimal profile (P4Mini). The tables below map
+P4Py targets **v1model** and **eBPF**. The tables below map
 supported constructs to their spec sections.
 
 [spec]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html

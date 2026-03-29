@@ -201,26 +201,3 @@ class _Sentinel:
 
 action = _Sentinel("decorator", "action")
 table = _Sentinel("builtin", "table")
-
-
-__all__ = [
-    "ACCEPT",
-    "REJECT",
-    "BitType",
-    "BoolType",
-    "NoAction",
-    "_Spec",
-    "action",
-    "bit",
-    "bool",
-    "control",
-    "deparser",
-    "exact",
-    "header",
-    "hex",
-    "literal",
-    "lpm",
-    "parser",
-    "struct",
-    "table",
-]
