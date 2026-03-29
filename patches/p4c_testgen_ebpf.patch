@@ -1,0 +1,22 @@
+--- a/backends/p4tools/BUILD.bazel
++++ b/backends/p4tools/BUILD.bazel
+@@ -11,7 +11,7 @@
+ )
+
+ # Extend the list with the name of the desired targets (in "modules/testgen/targets/).
+-TESTGEN_TARGETS = ["bmv2"]
++TESTGEN_TARGETS = ["bmv2", "ebpf"]
+
+ filegroup(
+     name = "ir_extension",
+@@ -152,7 +152,9 @@
+         "modules/testgen/lib/*.h",
+         "modules/testgen/*.h",
+     ]) + glob(
+-        ["modules/testgen/targets/%s/test_backend/*.h" % target for target in TESTGEN_TARGETS],
++        ["modules/testgen/targets/%s/test_backend/*.h" % target for target in TESTGEN_TARGETS] +
++        ["modules/testgen/targets/%s/backend/**/*.h" % target for target in TESTGEN_TARGETS],
++        allow_empty = True,
+     ),
+     copts = [
+         "-fexceptions",
