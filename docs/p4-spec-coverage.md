@@ -2,24 +2,24 @@
 
 What [P4-16 language spec][spec] constructs P4Py currently supports.
 
-P4Py targets **v1model** and **eBPF**. The tables below map
-supported constructs to their spec sections.
+P4Py targets **v1model** and **eBPF**. The tables below map supported constructs
+to their spec sections.
 
 [spec]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html
 
 ## Types
 
-| Construct     | Supported | Spec section                | Notes                          |
-| ------------- | --------- | --------------------------- | ------------------------------ |
-| `bit<W>`      | Yes       | [§7.1 Base types][bit]      | Only numeric type              |
-| `int<W>`      | No        | [§7.1 Base types][bit]      |                                |
-| `varbit`      | No        | [§7.1 Base types][bit]      |                                |
-| `bool`        | No        | [§7.1 Base types][bit]      |                                |
-| `header`      | Yes       | [§7.2 Header types][header] | Flat only, all fields `bit<W>` |
-| Header stacks | No        | [§7.2 Header types][header] |                                |
-| `struct`      | Yes       | [§7.2 Header types][struct] | Header and `bit<W>` members    |
-| `enum`        | No        | [§7.3 Other types][bit]     |                                |
-| `typedef`     | No        | [§7.3 Other types][bit]     |                                |
+| Construct     | Supported | Spec section                | Notes                                       |
+| ------------- | --------- | --------------------------- | ------------------------------------------- |
+| `bit<W>`      | Yes       | [§7.1 Base types][bit]      | Only numeric type                           |
+| `int<W>`      | No        | [§7.1 Base types][bit]      |                                             |
+| `varbit`      | No        | [§7.1 Base types][bit]      |                                             |
+| `bool`        | Yes       | [§7.1 Base types][bit]      | Action params, control output               |
+| `header`      | Yes       | [§7.2 Header types][header] | Flat only, all fields `bit<W>`              |
+| Header stacks | No        | [§7.2 Header types][header] |                                             |
+| `struct`      | Yes       | [§7.2 Header types][struct] | Header, `bit<W>`, and nested struct members |
+| `enum`        | No        | [§7.3 Other types][bit]     |                                             |
+| `typedef`     | No        | [§7.3 Other types][bit]     |                                             |
 
 [bit]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-bit-ops
 [header]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-header-types
@@ -46,20 +46,22 @@ supported constructs to their spec sections.
 
 ## Expressions
 
-| Construct                     | Supported | Spec section            | Notes                        |
-| ----------------------------- | --------- | ----------------------- | ---------------------------- |
-| Integer literals              | Yes       | [§8 Expressions][exprs] | Decimal and hex              |
-| Field access                  | Yes       | [§8 Expressions][exprs] | `hdr.ipv4.dstAddr`           |
-| `+`, `-`                      | Yes       | [§8 Expressions][exprs] |                              |
-| Bitwise (`&`, `\|`, `^`, `~`) | No        | [§8 Expressions][exprs] |                              |
-| Shifts (`<<`, `>>`)           | No        | [§8 Expressions][exprs] |                              |
-| Comparison (`==`, `!=`)       | No        | [§8 Expressions][exprs] | Only in `transition select`  |
-| Slicing                       | No        | [§8 Expressions][exprs] |                              |
-| Concatenation (`++`)          | No        | [§8 Expressions][exprs] |                              |
-| Casts                         | No        | [§8 Expressions][exprs] |                              |
-| `.isValid()`                  | Yes       | [§8 Expressions][exprs] | In control apply blocks only |
-| `.setValid()`                 | No        | [§8 Expressions][exprs] |                              |
-| `.setInvalid()`               | No        | [§8 Expressions][exprs] |                              |
+| Construct                     | Supported | Spec section            | Notes                         |
+| ----------------------------- | --------- | ----------------------- | ----------------------------- |
+| Integer literals              | Yes       | [§8 Expressions][exprs] | Decimal, hex, width-annotated |
+| Bool literals                 | Yes       | [§8 Expressions][exprs] | `true`, `false`               |
+| List expressions              | Yes       | [§8 Expressions][exprs] | For checksum data args        |
+| Field access                  | Yes       | [§8 Expressions][exprs] | `hdr.ipv4.dstAddr`            |
+| `+`, `-`                      | Yes       | [§8 Expressions][exprs] |                               |
+| Bitwise (`&`, `\|`, `^`, `~`) | No        | [§8 Expressions][exprs] |                               |
+| Shifts (`<<`, `>>`)           | No        | [§8 Expressions][exprs] |                               |
+| Comparison (`==`, `!=`)       | No        | [§8 Expressions][exprs] | Only in `transition select`   |
+| Slicing                       | No        | [§8 Expressions][exprs] |                               |
+| Concatenation (`++`)          | No        | [§8 Expressions][exprs] |                               |
+| Casts                         | No        | [§8 Expressions][exprs] |                               |
+| `.isValid()`                  | Yes       | [§8 Expressions][exprs] | In control apply blocks only  |
+| `.setValid()`                 | No        | [§8 Expressions][exprs] |                               |
+| `.setInvalid()`               | No        | [§8 Expressions][exprs] |                               |
 
 [exprs]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-exprs
 
@@ -88,7 +90,7 @@ supported constructs to their spec sections.
 | `ternary` match     | No        | [§14 Control blocks][tables]  |                                |
 | `range` match       | No        | [§14 Control blocks][tables]  |                                |
 | `table.apply()`     | Yes       | [§14 Control blocks][control] |                                |
-| `const entries`     | No        | [§14 Control blocks][tables]  |                                |
+| `const entries`     | Yes       | [§14 Control blocks][tables]  |                                |
 
 [control]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-control
 [actions]: https://p4.org/wp-content/uploads/sites/53/2024/10/P4-16-spec-v1.2.5.html#sec-actions
@@ -105,4 +107,5 @@ supported constructs to their spec sections.
 
 ## See also
 
-- [v1model coverage](v1model-coverage.md) for architecture-specific constructs.
+- [v1model coverage](v1model-coverage.md) for v1model-specific constructs.
+- [eBPF model coverage](ebpf-model-coverage.md) for eBPF-specific constructs.

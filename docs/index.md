@@ -17,6 +17,7 @@ import p4py
 
 p4-spec-coverage
 v1model-coverage
+ebpf-model-coverage
 architecture
 dev/guide
 ```

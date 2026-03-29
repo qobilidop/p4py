@@ -9,14 +9,14 @@ behavioral model documentation.
 
 ## Pipeline blocks
 
-| Block           | Supported | Notes              |
-| --------------- | --------- | ------------------ |
-| Parser          | Yes       |                    |
-| VerifyChecksum  | No        | Empty stub emitted |
-| Ingress         | Yes       |                    |
-| Egress          | No        | Empty stub emitted |
-| ComputeChecksum | No        | Empty stub emitted |
-| Deparser        | Yes       |                    |
+| Block           | Supported | Notes                 |
+| --------------- | --------- | --------------------- |
+| Parser          | Yes       |                       |
+| VerifyChecksum  | Yes       | Empty stub if omitted |
+| Ingress         | Yes       |                       |
+| Egress          | Yes       | Empty stub if omitted |
+| ComputeChecksum | Yes       | Empty stub if omitted |
+| Deparser        | Yes       |                       |
 
 ## `standard_metadata_t`
 
@@ -41,27 +41,27 @@ behavioral model documentation.
 
 ## Externs
 
-| Extern                         | Supported | Notes                 |
-| ------------------------------ | --------- | --------------------- |
-| `mark_to_drop`                 | Yes       | Only supported extern |
-| `counter`                      | No        |                       |
-| `direct_counter`               | No        |                       |
-| `meter`                        | No        |                       |
-| `direct_meter`                 | No        |                       |
-| `register`                     | No        |                       |
-| `action_profile`               | No        |                       |
-| `action_selector`              | No        |                       |
-| `hash`                         | No        |                       |
-| `digest`                       | No        |                       |
-| `random`                       | No        |                       |
-| `verify_checksum`              | No        |                       |
-| `update_checksum`              | No        |                       |
-| `verify_checksum_with_payload` | No        |                       |
-| `update_checksum_with_payload` | No        |                       |
-| `log_msg`                      | No        |                       |
-| `assert`                       | No        |                       |
-| `assume`                       | No        |                       |
-| `truncate`                     | No        |                       |
+| Extern                         | Supported | Notes                         |
+| ------------------------------ | --------- | ----------------------------- |
+| `mark_to_drop`                 | Yes       | Sets egress_spec to drop port |
+| `counter`                      | No        |                               |
+| `direct_counter`               | No        |                               |
+| `meter`                        | No        |                               |
+| `direct_meter`                 | No        |                               |
+| `register`                     | No        |                               |
+| `action_profile`               | No        |                               |
+| `action_selector`              | No        |                               |
+| `hash`                         | No        |                               |
+| `digest`                       | No        |                               |
+| `random`                       | No        |                               |
+| `verify_checksum`              | Yes       | No-op in simulation           |
+| `update_checksum`              | Yes       | RFC 1071 ones' complement     |
+| `verify_checksum_with_payload` | No        |                               |
+| `update_checksum_with_payload` | No        |                               |
+| `log_msg`                      | No        |                               |
+| `assert`                       | No        |                               |
+| `assume`                       | No        |                               |
+| `truncate`                     | No        |                               |
 
 ## Packet operations
 
