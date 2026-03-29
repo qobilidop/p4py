@@ -27,10 +27,14 @@ struct headers_t {
     ipv4_t ipv4;
 }
 
-struct metadata_t {
-    bit<16> nexthop_index;
-    bit<16> bd;
+struct ingress_metadata_t {
     bit<12> vrf;
+    bit<16> bd;
+    bit<16> nexthop_index;
+}
+
+struct metadata_t {
+    ingress_metadata_t ingress_metadata;
 }
 
 parser ParserImpl(packet_in pkt,
@@ -38,6 +42,9 @@ parser ParserImpl(packet_in pkt,
                 inout metadata_t meta,
                 inout standard_metadata_t std_meta) {
     state start {
+        transition parse_ethernet;
+    }
+    state parse_ethernet {
         pkt.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             0x0800: parse_ipv4;
@@ -67,15 +74,15 @@ control ingress(inout headers_t hdr,
     }
 
     action set_bd(bit<16> bd) {
-        meta.bd = bd;
+        meta.ingress_metadata.bd = bd;
     }
 
     action set_vrf(bit<12> vrf) {
-        meta.vrf = vrf;
+        meta.ingress_metadata.vrf = vrf;
     }
 
     action fib_hit_nexthop(bit<16> nexthop_index) {
-        meta.nexthop_index = nexthop_index;
+        meta.ingress_metadata.nexthop_index = nexthop_index;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
@@ -94,9 +101,9 @@ control ingress(inout headers_t hdr,
         default_action = on_miss();
     }
 
-    table bd_table {
+    table bd {
         key = {
-            meta.bd: exact;
+            meta.ingress_metadata.bd: exact;
         }
         actions = {
             on_miss;
@@ -107,6 +114,7 @@ control ingress(inout headers_t hdr,
 
     table ipv4_fib {
         key = {
+            meta.ingress_metadata.vrf: exact;
             hdr.ipv4.dstAddr: exact;
         }
         actions = {
@@ -118,6 +126,7 @@ control ingress(inout headers_t hdr,
 
     table ipv4_fib_lpm {
         key = {
+            meta.ingress_metadata.vrf: exact;
             hdr.ipv4.dstAddr: lpm;
         }
         actions = {
@@ -129,7 +138,7 @@ control ingress(inout headers_t hdr,
 
     table nexthop {
         key = {
-            meta.nexthop_index: exact;
+            meta.ingress_metadata.nexthop_index: exact;
         }
         actions = {
             on_miss;
@@ -139,9 +148,9 @@ control ingress(inout headers_t hdr,
     }
 
     apply {
-        port_mapping.apply();
-        bd_table.apply();
         if (hdr.ipv4.isValid()) {
+            port_mapping.apply();
+            bd.apply();
             switch (ipv4_fib.apply().action_run) {
                 on_miss: {
                     ipv4_fib_lpm.apply();
@@ -158,24 +167,24 @@ control egress(inout headers_t hdr,
     action on_miss() {
     }
 
-    action rewrite_mac(bit<48> smac, bit<48> dmac) {
+    action rewrite_src_dst_mac(bit<48> smac, bit<48> dmac) {
         hdr.ethernet.srcAddr = smac;
         hdr.ethernet.dstAddr = dmac;
     }
 
-    table rewrite_mac_table {
+    table rewrite_mac {
         key = {
-            meta.nexthop_index: exact;
+            meta.ingress_metadata.nexthop_index: exact;
         }
         actions = {
             on_miss;
-            rewrite_mac;
+            rewrite_src_dst_mac;
         }
         default_action = on_miss();
     }
 
     apply {
-        rewrite_mac_table.apply();
+        rewrite_mac.apply();
     }
 }
 

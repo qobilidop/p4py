@@ -79,13 +79,13 @@ class struct:
         members: list[tuple[str, type | BitType]] = []
         for name, ann in cls.__annotations__.items():
             if isinstance(ann, BitType) or (
-                isinstance(ann, type) and issubclass(ann, header)
+                isinstance(ann, type) and issubclass(ann, (header, struct))
             ):
                 members.append((name, ann))
             else:
                 raise TypeError(
-                    f"Struct member '{name}' must be a header subclass or bit<W>,"
-                    f" got {ann!r}"
+                    f"Struct member '{name}' must be a header subclass,"
+                    f" struct subclass, or bit<W>, got {ann!r}"
                 )
         cls._p4_name = cls.__name__
         cls._p4_members = tuple(members)

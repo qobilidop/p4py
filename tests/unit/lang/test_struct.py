@@ -36,6 +36,17 @@ class TestStruct(absltest.TestCase):
         self.assertEqual(meta_t._p4_members[0], ("vrf", p4.bit(12)))
         self.assertEqual(meta_t._p4_members[1], ("bd", p4.bit(16)))
 
+    def test_nested_struct_members(self):
+        class inner_t(p4.struct):
+            vrf: p4.bit(12)
+            bd: p4.bit(16)
+
+        class outer_t(p4.struct):
+            ingress_metadata: inner_t
+
+        self.assertLen(outer_t._p4_members, 1)
+        self.assertEqual(outer_t._p4_members[0], ("ingress_metadata", inner_t))
+
     def test_non_header_non_bit_annotation_rejected(self):
         with self.assertRaises(TypeError) as cm:
 

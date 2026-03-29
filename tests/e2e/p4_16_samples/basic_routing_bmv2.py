@@ -1,10 +1,9 @@
-"""Simplified basic_routing-bmv2 in P4Py DSL.
+"""Faithful basic_routing-bmv2 in P4Py DSL.
 
-Adapted from p4lang/p4c testdata/p4_16_samples/basic_routing-bmv2.p4.
-Implements IPv4 routing with LPM forwarding using the subset of P4
-that P4Py currently supports.
+1:1 translation of p4lang/p4c testdata/p4_16_samples/basic_routing-bmv2.p4.
+Remaining differences from upstream are tracked as TODOs.
 
-See the original for the full program:
+See the original:
 https://github.com/p4lang/p4c/blob/main/testdata/p4_16_samples/basic_routing-bmv2.p4
 """
 
@@ -38,15 +37,22 @@ class headers_t(p4.struct):
     ipv4: ipv4_t
 
 
-class metadata_t(p4.struct):
-    nexthop_index: p4.bit(16)
-    bd: p4.bit(16)
+class ingress_metadata_t(p4.struct):
     vrf: p4.bit(12)
+    bd: p4.bit(16)
+    nexthop_index: p4.bit(16)
+
+
+class metadata_t(p4.struct):
+    ingress_metadata: ingress_metadata_t
 
 
 @p4.parser
 def ParserImpl(pkt, hdr: headers_t, meta: metadata_t, std_meta):
     def start():
+        return parse_ethernet
+
+    def parse_ethernet():
         pkt.extract(hdr.ethernet)
         match hdr.ethernet.etherType:
             case 0x0800:
@@ -66,17 +72,17 @@ def egress(hdr, meta, std_meta):
         pass
 
     @p4.action
-    def rewrite_mac(smac: p4.bit(48), dmac: p4.bit(48)):
+    def rewrite_src_dst_mac(smac: p4.bit(48), dmac: p4.bit(48)):
         hdr.ethernet.srcAddr = smac
         hdr.ethernet.dstAddr = dmac
 
-    rewrite_mac_table = p4.table(
-        key={meta.nexthop_index: p4.exact},
-        actions=[on_miss, rewrite_mac],
+    rewrite_mac = p4.table(
+        key={meta.ingress_metadata.nexthop_index: p4.exact},
+        actions=[on_miss, rewrite_src_dst_mac],
         default_action=on_miss,
     )
 
-    rewrite_mac_table.apply()
+    rewrite_mac.apply()
 
 
 @p4.control
@@ -87,37 +93,45 @@ def ingress(hdr, meta, std_meta):
 
     @p4.action
     def set_bd(bd: p4.bit(16)):
-        meta.bd = bd
+        meta.ingress_metadata.bd = bd
 
     @p4.action
     def set_vrf(vrf: p4.bit(12)):
-        meta.vrf = vrf
+        meta.ingress_metadata.vrf = vrf
 
+    # TODO: Upstream has actions=[set_bd] only (no on_miss).
     port_mapping = p4.table(
         key={std_meta.ingress_port: p4.exact},
         actions=[on_miss, set_bd],
         default_action=on_miss,
     )
 
-    bd_table = p4.table(
-        key={meta.bd: p4.exact},
+    # TODO: Upstream has actions=[set_vrf] only (no on_miss).
+    bd = p4.table(
+        key={meta.ingress_metadata.bd: p4.exact},
         actions=[on_miss, set_vrf],
         default_action=on_miss,
     )
 
     @p4.action
     def fib_hit_nexthop(nexthop_index: p4.bit(16)):
-        meta.nexthop_index = nexthop_index
+        meta.ingress_metadata.nexthop_index = nexthop_index
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1
 
     ipv4_fib = p4.table(
-        key={hdr.ipv4.dstAddr: p4.exact},
+        key={
+            meta.ingress_metadata.vrf: p4.exact,
+            hdr.ipv4.dstAddr: p4.exact,
+        },
         actions=[on_miss, fib_hit_nexthop],
         default_action=on_miss,
     )
 
     ipv4_fib_lpm = p4.table(
-        key={hdr.ipv4.dstAddr: p4.lpm},
+        key={
+            meta.ingress_metadata.vrf: p4.exact,
+            hdr.ipv4.dstAddr: p4.lpm,
+        },
         actions=[on_miss, fib_hit_nexthop],
         default_action=on_miss,
     )
@@ -127,14 +141,14 @@ def ingress(hdr, meta, std_meta):
         std_meta.egress_spec = egress_spec
 
     nexthop = p4.table(
-        key={meta.nexthop_index: p4.exact},
+        key={meta.ingress_metadata.nexthop_index: p4.exact},
         actions=[on_miss, set_egress_details],
         default_action=on_miss,
     )
 
-    port_mapping.apply()
-    bd_table.apply()
     if hdr.ipv4.isValid():
+        port_mapping.apply()
+        bd.apply()
         # Try exact FIB first; fall through to LPM on miss.
         match ipv4_fib.apply():
             case "on_miss":
@@ -142,6 +156,7 @@ def ingress(hdr, meta, std_meta):
         nexthop.apply()
 
 
+# TODO: Upstream uses condition=true, not hdr.ipv4.isValid().
 @p4.control
 def verifyChecksum(hdr, meta):
     v1model.verify_checksum(

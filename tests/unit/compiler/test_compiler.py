@@ -292,6 +292,52 @@ class TestCompileProgram(absltest.TestCase):
             program.structs[0].members[0], nodes.StructMember("ethernet", "ethernet_t")
         )
 
+    def test_nested_struct_compiled(self):
+        class ingress_metadata_t(p4.struct):
+            vrf: p4.bit(12)
+            bd: p4.bit(16)
+
+        class nested_meta_t(p4.struct):
+            ingress_metadata: ingress_metadata_t
+
+        @p4.parser
+        def P(pkt, hdr: headers_t, meta: nested_meta_t, std_meta):
+            def start():
+                return p4.ACCEPT
+
+        @p4.control
+        def I(hdr, meta, std_meta):
+            pass
+
+        @p4.deparser
+        def D(pkt, hdr):
+            pass
+
+        pipeline = V1Switch(parser=P, ingress=I, deparser=D)
+        program = compile(pipeline)
+
+        # Inner struct should appear before outer struct.
+        struct_names = [s.name for s in program.structs]
+        self.assertIn("ingress_metadata_t", struct_names)
+        self.assertIn("nested_meta_t", struct_names)
+        self.assertLess(
+            struct_names.index("ingress_metadata_t"),
+            struct_names.index("nested_meta_t"),
+        )
+
+        # Outer struct should reference inner by name.
+        outer = next(s for s in program.structs if s.name == "nested_meta_t")
+        self.assertLen(outer.members, 1)
+        self.assertEqual(
+            outer.members[0],
+            nodes.StructMember("ingress_metadata", "ingress_metadata_t"),
+        )
+
+        # Inner struct should have bit fields.
+        inner = next(s for s in program.structs if s.name == "ingress_metadata_t")
+        self.assertLen(inner.members, 2)
+        self.assertEqual(inner.members[0], nodes.StructMember("vrf", nodes.BitType(12)))
+
 
 if __name__ == "__main__":
     absltest.main()

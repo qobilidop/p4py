@@ -57,8 +57,18 @@ def _compile_structs(
     headers_struct: type, metadata_struct: type
 ) -> tuple[nodes.StructType, ...]:
     """Compile struct types to IR."""
+    from p4py.lang._types import struct as p4_struct
+
     result = []
-    for s in (headers_struct, metadata_struct):
+    seen: set[str] = set()
+
+    def _compile_one(s: type) -> None:
+        if s._p4_name in seen:
+            return
+        # Compile inner structs first so they appear before outer structs.
+        for _, ann in s._p4_members:
+            if isinstance(ann, type) and issubclass(ann, p4_struct):
+                _compile_one(ann)
         members = []
         for name, ann in s._p4_members:
             if hasattr(ann, "width"):
@@ -66,6 +76,10 @@ def _compile_structs(
             else:
                 members.append(nodes.StructMember(name, ann._p4_name))
         result.append(nodes.StructType(name=s._p4_name, members=tuple(members)))
+        seen.add(s._p4_name)
+
+    for s in (headers_struct, metadata_struct):
+        _compile_one(s)
     return tuple(result)
 
 

@@ -60,6 +60,7 @@ def simulate(
     headers: dict[str, _HeaderInstance] = {}
     metadata: dict[str, int] = {}
     header_types = {h.name: h for h in program.headers}
+    struct_types = {s.name: s for s in program.structs}
     for s in program.structs:
         for member in s.members:
             if isinstance(member.type, nodes.BitType):
@@ -69,6 +70,12 @@ def simulate(
                 headers[member.name] = _HeaderInstance(
                     type_info=header_types[member.type]
                 )
+            elif isinstance(member.type, str) and member.type in struct_types:
+                # Nested struct — expand inner fields with dotted prefix.
+                inner = struct_types[member.type]
+                for inner_member in inner.members:
+                    if isinstance(inner_member.type, nodes.BitType):
+                        metadata[f"{member.name}.{inner_member.name}"] = 0
 
     state = _SimState(
         packet_bytes=bytearray(packet),
@@ -223,6 +230,25 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
     return table.default_action
 
 
+def _resolve_struct_field_width(
+    s: nodes.StructType,
+    remaining: list[str],
+    struct_types: dict[str, nodes.StructType],
+) -> int | None:
+    """Walk a struct chain to resolve a field's bit width."""
+    for member in s.members:
+        if member.name == remaining[0]:
+            if len(remaining) == 1 and isinstance(member.type, nodes.BitType):
+                return member.type.width
+            if len(remaining) > 1 and isinstance(member.type, str):
+                inner = struct_types.get(member.type)
+                if inner is not None:
+                    return _resolve_struct_field_width(
+                        inner, remaining[1:], struct_types
+                    )
+    return None
+
+
 def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:
     """Look up the bit width of a header or metadata field."""
     path = field.path
@@ -232,12 +258,16 @@ def _resolve_field_width(state: _SimState, field: nodes.FieldAccess) -> int:
         for hf in header_inst.type_info.fields:
             if hf.name == path[2]:
                 return hf.type.width
-    # meta.field → look up from program struct definitions
-    if path[0] == "meta" and len(path) == 2:
+    # meta.field or meta.struct.field → look up from program struct definitions
+    if path[0] == "meta" and len(path) >= 2:
+        # For nested paths like meta.ingress_metadata.vrf, walk the struct chain.
+        struct_types = {s.name: s for s in state.program.structs}
+        # Start from all top-level structs and try to resolve.
+        remaining = list(path[1:])
         for s in state.program.structs:
-            for member in s.members:
-                if member.name == path[1] and isinstance(member.type, nodes.BitType):
-                    return member.type.width
+            result = _resolve_struct_field_width(s, remaining, struct_types)
+            if result is not None:
+                return result
     # std_meta.field → look up from standard_metadata_t definition
     if path[0] == "std_meta" and len(path) == 2:
         from p4py.arch.v1model import standard_metadata_t
@@ -453,9 +483,10 @@ def _get_field(state: _SimState, fa: nodes.FieldAccess, locals_: dict[str, int])
     # std_meta.field
     if path[0] == "std_meta":
         return state.std_meta[path[1]]
-    # meta.field
+    # meta.field or meta.struct.field
     if path[0] == "meta":
-        return state.metadata[path[1]]
+        key = ".".join(path[1:])
+        return state.metadata[key]
     # hdr.header.field
     if path[0] == "hdr" and len(path) == 3:
         return state.headers[path[1]].fields.get(path[2], 0)
@@ -468,7 +499,8 @@ def _set_field(state: _SimState, fa: nodes.FieldAccess, value: int) -> None:
     if path[0] == "std_meta":
         state.std_meta[path[1]] = value
     elif path[0] == "meta":
-        state.metadata[path[1]] = value
+        key = ".".join(path[1:])
+        state.metadata[key] = value
     elif path[0] == "hdr" and len(path) == 3:
         state.headers[path[1]].fields[path[2]] = value
     else:

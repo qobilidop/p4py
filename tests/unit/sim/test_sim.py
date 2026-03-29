@@ -501,6 +501,86 @@ class TestSimulator(absltest.TestCase):
         )
         self.assertTrue(result.dropped)
 
+    def test_nested_metadata_struct(self):
+        """Nested metadata struct fields are read/written correctly."""
+
+        class inner_meta_t(p4.struct):
+            nexthop_index: p4.bit(16)
+
+        class nested_meta_t(p4.struct):
+            ingress_metadata: inner_meta_t
+
+        @p4.parser
+        def MyParser(pkt, hdr: headers_t, meta: nested_meta_t, std_meta):
+            def start():
+                pkt.extract(hdr.ethernet)
+                match hdr.ethernet.etherType:
+                    case 0x0800:
+                        return parse_ipv4
+                    case _:
+                        return p4.ACCEPT
+
+            def parse_ipv4():
+                pkt.extract(hdr.ipv4)
+                return p4.ACCEPT
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            @p4.action
+            def set_nexthop(idx: p4.bit(16)):
+                meta.ingress_metadata.nexthop_index = idx
+
+            @p4.action
+            def forward(port: p4.bit(9)):
+                std_meta.egress_spec = port
+
+            lookup = p4.table(
+                key={meta.ingress_metadata.nexthop_index: p4.exact},
+                actions=[forward],
+                default_action=forward(0),
+            )
+
+            fib = p4.table(
+                key={hdr.ipv4.dstAddr: p4.exact},
+                actions=[set_nexthop],
+                default_action=set_nexthop(0),
+            )
+
+            if hdr.ipv4.isValid():
+                fib.apply()
+                lookup.apply()
+
+        @p4.deparser
+        def MyDeparser(pkt, hdr):
+            pkt.emit(hdr.ethernet)
+            pkt.emit(hdr.ipv4)
+
+        program = compile(
+            V1Switch(parser=MyParser, ingress=MyIngress, deparser=MyDeparser)
+        )
+
+        table_entries = {
+            "fib": [
+                {
+                    "key": {"hdr.ipv4.dstAddr": 0x0A000002},
+                    "action": "set_nexthop",
+                    "args": {"idx": 1},
+                },
+            ],
+            "lookup": [
+                {
+                    "key": {"meta.ingress_metadata.nexthop_index": 1},
+                    "action": "forward",
+                    "args": {"port": 7},
+                },
+            ],
+        }
+        result = simulate(
+            program, packet=TEST_PACKET, ingress_port=0, table_entries=table_entries
+        )
+        self.assertFalse(result.dropped)
+        self.assertEqual(result.egress_port, 7)
+
 
 if __name__ == "__main__":
     absltest.main()

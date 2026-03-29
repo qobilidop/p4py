@@ -2,21 +2,21 @@
 add ingress.port_mapping ingress.set_bd(bd:10) std_meta.ingress_port:0
 
 # BD to VRF
-add ingress.bd_table ingress.set_vrf(vrf:1) meta.bd:10
+add ingress.bd ingress.set_vrf(vrf:1) meta.ingress_metadata.bd:10
 
-# Exact FIB: 10.0.0.2 → nexthop 1
-add ingress.ipv4_fib ingress.fib_hit_nexthop(nexthop_index:1) hdr.ipv4.dstAddr:0x0A000002
+# Exact FIB: vrf=1, 10.0.0.2 → nexthop 1
+add ingress.ipv4_fib ingress.fib_hit_nexthop(nexthop_index:1) meta.ingress_metadata.vrf:1 hdr.ipv4.dstAddr:0x0A000002
 
-# LPM FIB: 10.0.0.0/8 → nexthop 2
-add ingress.ipv4_fib_lpm ingress.fib_hit_nexthop(nexthop_index:2) hdr.ipv4.dstAddr:0x0A000000/8
+# LPM FIB: vrf=1, 10.0.0.0/8 → nexthop 2
+add ingress.ipv4_fib_lpm ingress.fib_hit_nexthop(nexthop_index:2) meta.ingress_metadata.vrf:1 hdr.ipv4.dstAddr:0x0A000000/8
 
 # Nexthop resolution
-add ingress.nexthop ingress.set_egress_details(egress_spec:5) meta.nexthop_index:1
-add ingress.nexthop ingress.set_egress_details(egress_spec:7) meta.nexthop_index:2
+add ingress.nexthop ingress.set_egress_details(egress_spec:5) meta.ingress_metadata.nexthop_index:1
+add ingress.nexthop ingress.set_egress_details(egress_spec:7) meta.ingress_metadata.nexthop_index:2
 
 # MAC rewrite (egress)
-add egress.rewrite_mac_table egress.rewrite_mac(smac:0x00000000AA01, dmac:0x00000000BB01) meta.nexthop_index:1
-add egress.rewrite_mac_table egress.rewrite_mac(smac:0x00000000AA02, dmac:0x00000000BB02) meta.nexthop_index:2
+add egress.rewrite_mac egress.rewrite_src_dst_mac(smac:0x00000000AA01, dmac:0x00000000BB01) meta.ingress_metadata.nexthop_index:1
+add egress.rewrite_mac egress.rewrite_src_dst_mac(smac:0x00000000AA02, dmac:0x00000000BB02) meta.ingress_metadata.nexthop_index:2
 
 # Packet to 10.0.0.2: exact FIB → nexthop 1 → port 5, MAC rewrite, TTL 64→63
 packet 0 000000000001 000000000002 0800 45000014 00000000 40060000 0A000001 0A000002
