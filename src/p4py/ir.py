@@ -150,6 +150,11 @@ class Cast:
     expr: Expression
 
 
+@dataclass(frozen=True)
+class ConstRef:
+    name: str
+
+
 Expression = (
     FieldAccess
     | IntLiteral
@@ -160,6 +165,7 @@ Expression = (
     | Masked
     | Wildcard
     | Cast
+    | ConstRef
 )
 
 
@@ -251,7 +257,7 @@ class Transition:
 
 @dataclass(frozen=True)
 class SelectCase:
-    value: int | None  # None = default
+    value: int | ConstRef | None  # None = default
     next_state: str
 
 

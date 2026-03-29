@@ -285,6 +285,12 @@ class TestCastExpression(absltest.TestCase):
         self.assertIsInstance(cast.expr, nodes.FieldAccess)
 
 
+class TestConstRefExpression(absltest.TestCase):
+    def test_const_ref_expression(self):
+        ref = nodes.ConstRef(name="ETHERTYPE_IPV4")
+        self.assertEqual(ref.name, "ETHERTYPE_IPV4")
+
+
 class TestNodesFrozen(absltest.TestCase):
     def test_nodes_are_frozen(self):
         t = nodes.BitType(width=8)
