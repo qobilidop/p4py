@@ -237,6 +237,8 @@ def _emit_parser_state(lines: list[str], state: ir.ParserState) -> None:
         for case in ts.cases:
             if case.value is None:
                 lines.append(f"            default: {case.next_state};")
+            elif isinstance(case.value, ir.ConstRef):
+                lines.append(f"            {case.value.name}: {case.next_state};")
             else:
                 lines.append(
                     f"            {_emit_int_literal(case.value)}: {case.next_state};"
@@ -403,6 +405,8 @@ def _emit_expression(expr: ir.Expression) -> str:
         return "_"
     if isinstance(expr, ir.Cast):
         return f"({expr.type_name}) {_emit_expression(expr.expr)}"
+    if isinstance(expr, ir.ConstRef):
+        return expr.name
     raise ValueError(f"Cannot emit expression: {expr}")
 
 

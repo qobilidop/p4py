@@ -205,6 +205,12 @@ class TestEmitExpression(absltest.TestCase):
         result = p4_emitter._emit_expression(cast)
         self.assertEqual(result, "(port_id_t) standard_metadata.ingress_port")
 
+    def test_emit_const_ref_expression(self):
+        """ConstRef expression emits as the constant name."""
+        ref = ir.ConstRef(name="ETHERTYPE_IPV4")
+        result = p4_emitter._emit_expression(ref)
+        self.assertEqual(result, "ETHERTYPE_IPV4")
+
 
 if __name__ == "__main__":
     absltest.main()
