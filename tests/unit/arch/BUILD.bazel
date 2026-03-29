@@ -17,3 +17,12 @@ py_test(
         "@pip//absl_py",
     ],
 )
+
+py_test(
+    name = "test_base",
+    srcs = ["test_base.py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
+)
