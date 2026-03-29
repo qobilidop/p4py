@@ -24,7 +24,7 @@ parser MyParser(packet_in pkt,
     }
 }
 
-control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {
+control MyVerifyChecksum(inout headers_t h, inout metadata_t m) {
     apply {}
 }
 
@@ -55,13 +55,13 @@ control MyIngress(inout headers_t hdr,
     }
 }
 
-control MyEgress(inout headers_t hdr,
-                  inout metadata_t meta,
-                  inout standard_metadata_t std_meta) {
+control MyEgress(inout headers_t h,
+                  inout metadata_t m,
+                  inout standard_metadata_t sm) {
     apply {}
 }
 
-control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
+control MyComputeChecksum(inout headers_t h, inout metadata_t m) {
     apply {}
 }
 

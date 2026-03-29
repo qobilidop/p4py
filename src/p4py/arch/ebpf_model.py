@@ -48,14 +48,10 @@ class EbpfFilterArch(Architecture):
     def block_signature(self, block_name, struct_names, param_names=()):
         ht = struct_names["headers"]
         if block_name == "parser":
-            pkt, h = (
-                param_names if len(param_names) == 2 else ("p", "headers")
-            )
+            pkt, h = param_names if len(param_names) == 2 else ("p", "headers")
             return f"parser {{name}}(packet_in {pkt}, out {ht} {h})"
         # filter: control(inout headers, out bool pass_)
-        h, out = (
-            param_names if len(param_names) == 2 else ("headers", "pass_")
-        )
+        h, out = param_names if len(param_names) == 2 else ("headers", "pass_")
         return f"control {{name}}(inout {ht} {h}, out bool {out})"
 
     def main_instantiation(self, block_names):

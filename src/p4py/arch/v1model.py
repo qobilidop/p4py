@@ -95,7 +95,9 @@ class V1ModelArch(Architecture):
         if block_name == "parser":
             # parser(packet_in, out headers, inout meta, inout standard_metadata_t)
             pkt, h, m, sm = (
-                param_names if len(param_names) == 4 else ("pkt", "hdr", "meta", "std_meta")
+                param_names
+                if len(param_names) == 4
+                else ("pkt", "hdr", "meta", "std_meta")
             )
             return (
                 f"parser {{name}}(packet_in {pkt},\n"
@@ -105,20 +107,14 @@ class V1ModelArch(Architecture):
             )
         if block_name in ("verify_checksum", "compute_checksum"):
             # control(inout headers, inout meta)
-            h, m = (
-                param_names if len(param_names) == 2 else ("hdr", "meta")
-            )
+            h, m = param_names if len(param_names) == 2 else ("hdr", "meta")
             return f"control {{name}}(inout {ht} {h}, inout {mt} {m})"
         if block_name == "deparser":
             # control(packet_out, in headers)
-            pkt, h = (
-                param_names if len(param_names) == 2 else ("pkt", "hdr")
-            )
+            pkt, h = param_names if len(param_names) == 2 else ("pkt", "hdr")
             return f"control {{name}}(packet_out {pkt}, in {ht} {h})"
         # ingress, egress: control(inout headers, inout meta, inout standard_metadata_t)
-        h, m, sm = (
-            param_names if len(param_names) == 3 else ("hdr", "meta", "std_meta")
-        )
+        h, m, sm = param_names if len(param_names) == 3 else ("hdr", "meta", "std_meta")
         return (
             f"control {{name}}(inout {ht} {h},\n"
             f"                  inout {mt} {m},\n"

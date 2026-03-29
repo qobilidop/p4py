@@ -93,7 +93,16 @@ class Wildcard:
     pass
 
 
-Expression = FieldAccess | IntLiteral | BoolLiteral | ArithOp | IsValid | ListExpression | Masked | Wildcard
+Expression = (
+    FieldAccess
+    | IntLiteral
+    | BoolLiteral
+    | ArithOp
+    | IsValid
+    | ListExpression
+    | Masked
+    | Wildcard
+)
 
 
 # --- Statements ---
