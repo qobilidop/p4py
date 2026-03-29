@@ -83,7 +83,7 @@ def _emit_ebpf_control(
     lines: list[str], c: nodes.ControlDecl, headers_name: str
 ) -> None:
     lines.append(
-        f"control {c.name}(inout {headers_name} headers, out bool pass) {{"
+        f"control {c.name}(inout {headers_name} headers, out bool accept) {{"
     )
 
     for action in c.actions:

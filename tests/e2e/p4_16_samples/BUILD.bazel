@@ -28,3 +28,16 @@ p4testgen_test(
     p4_library = ":basic_routing_bmv2",
     p4_module = "tests.e2e.p4_16_samples.basic_routing_bmv2",
 )
+
+py_library(
+    name = "init_ebpf",
+    srcs = ["init_ebpf.py"],
+    deps = ["//src/p4py"],
+)
+
+golden_test(
+    name = "init_ebpf_golden_test",
+    golden_file = "init_ebpf.p4",
+    p4_library = ":init_ebpf",
+    p4_module = "tests.e2e.p4_16_samples.init_ebpf",
+)
