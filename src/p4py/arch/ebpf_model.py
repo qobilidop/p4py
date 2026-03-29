@@ -7,6 +7,7 @@ Matches the ebpf_model.p4 architecture definition.
 from dataclasses import dataclass
 
 import p4py.lang as p4
+from p4py.arch.base import Architecture, BlockSpec
 from p4py.lang import _Spec
 
 
@@ -32,6 +33,38 @@ def array_table(size: int) -> _TableImpl:
     return _TableImpl("array_table", size)
 
 
+class EbpfFilterArch(Architecture):
+    @property
+    def include(self) -> str:
+        return "ebpf_model.p4"
+
+    @property
+    def pipeline(self) -> tuple[BlockSpec, ...]:
+        return (
+            BlockSpec("parser", "parser"),
+            BlockSpec("filter", "control"),
+        )
+
+    def block_signature(self, block_name, struct_names):
+        h = struct_names["headers"]
+        if block_name == "parser":
+            return f"parser {{name}}(packet_in p, out {h} headers)"
+        # filter
+        return f"control {{name}}(inout {h} headers, out bool pass_)"
+
+    def main_instantiation(self, block_names):
+        return f"ebpfFilter({block_names['parser']}(), {block_names['filter']}()) main;"
+
+    def emit_boilerplate(self, lines, spec, struct_names):
+        pass  # All blocks required; no boilerplate needed.
+
+    def process_packet(self, package, engine_cls, packet, ingress_port, table_entries):
+        raise NotImplementedError("Implemented in Task 8")
+
+
+_EBPF_ARCH = EbpfFilterArch()
+
+
 @dataclass
 class ebpfFilter:
     """eBPF filter pipeline with field order matching ebpf_model.p4.
@@ -44,6 +77,7 @@ class ebpfFilter:
     filter: _Spec | None = None
 
     def __post_init__(self) -> None:
+        self.arch: Architecture = _EBPF_ARCH
         if self.parser is not None:
             annotations = self.parser._p4_annotations
             self.headers: type[p4.struct] = annotations.get("headers")
