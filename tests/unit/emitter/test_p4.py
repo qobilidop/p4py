@@ -7,6 +7,8 @@ from p4py.arch import ebpf_model
 from p4py.arch.ebpf_model import ebpfFilter
 from p4py.arch.v1model import V1Switch, mark_to_drop
 from p4py.compiler import compile
+from p4py import ir
+from p4py.emitter import p4 as p4_emitter
 from p4py.emitter.p4 import emit
 
 
@@ -191,6 +193,17 @@ class TestEmitEbpf(absltest.TestCase):
         # Must NOT contain v1model artifacts.
         self.assertNotIn("v1model", source)
         self.assertNotIn("standard_metadata", source)
+
+
+class TestEmitExpression(absltest.TestCase):
+    def test_emit_cast_expression(self):
+        """Cast expression emits as (type) expr."""
+        cast = ir.Cast(
+            type_name="port_id_t",
+            expr=ir.FieldAccess(path=("standard_metadata", "ingress_port")),
+        )
+        result = p4_emitter._emit_expression(cast)
+        self.assertEqual(result, "(port_id_t) standard_metadata.ingress_port")
 
 
 if __name__ == "__main__":

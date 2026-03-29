@@ -401,6 +401,8 @@ def _emit_expression(expr: ir.Expression) -> str:
         return f"{_emit_expression(expr.value)} &&& {_emit_expression(expr.mask)}"
     if isinstance(expr, ir.Wildcard):
         return "_"
+    if isinstance(expr, ir.Cast):
+        return f"({expr.type_name}) {_emit_expression(expr.expr)}"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 
