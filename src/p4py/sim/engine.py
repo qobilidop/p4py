@@ -244,9 +244,7 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
         return action_name
 
     for const_entry in table.const_entries:
-        const_values = tuple(_eval_expression(state, v, {}) for v in const_entry.values)
-        lookup_values = tuple(lookup_key.values())
-        if const_values == lookup_values:
+        if _const_entry_matches(state, const_entry, lookup_key):
             action_args = _build_const_entry_args(
                 const_entry, ctx.actions.get(const_entry.action_name)
             )
@@ -256,6 +254,28 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
     if table.default_action:
         _exec_action_by_name(state, table.default_action, {}, ctx)
     return table.default_action
+
+
+def _const_entry_matches(
+    state: _SimState,
+    entry: ir.ConstEntry,
+    lookup_key: dict[str, int],
+) -> bool:
+    """Check if a const entry matches the lookup key values."""
+    lookup_values = tuple(lookup_key.values())
+    for entry_expr, lookup_val in zip(entry.values, lookup_values, strict=True):
+        if isinstance(entry_expr, ir.Wildcard):
+            continue
+        if isinstance(entry_expr, ir.Masked):
+            entry_val = _eval_expression(state, entry_expr.value, {})
+            mask_val = _eval_expression(state, entry_expr.mask, {})
+            if (lookup_val & mask_val) != (entry_val & mask_val):
+                return False
+        else:
+            entry_val = _eval_expression(state, entry_expr, {})
+            if entry_val != lookup_val:
+                return False
+    return True
 
 
 def _build_const_entry_args(
