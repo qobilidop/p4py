@@ -225,8 +225,9 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
         _exec_action_by_name(state, action_name, best_match.get("args", {}), ctx)
         return action_name
 
-    # No match — execute default action.
-    _exec_action_by_name(state, table.default_action, {}, ctx)
+    # No match — execute default action (no-op if none specified).
+    if table.default_action:
+        _exec_action_by_name(state, table.default_action, {}, ctx)
     return table.default_action
 
 
@@ -451,6 +452,8 @@ def _eval_expression(
     state: _SimState, expr: nodes.Expression, locals_: dict[str, int]
 ) -> int:
     """Evaluate an expression to an integer value."""
+    if isinstance(expr, nodes.BoolLiteral):
+        return int(expr.value)
     if isinstance(expr, nodes.IntLiteral):
         return expr.value
     if isinstance(expr, nodes.FieldAccess):

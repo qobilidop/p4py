@@ -59,6 +59,12 @@ class TestExpressions(absltest.TestCase):
         )
         self.assertEqual(expr.op, "-")
 
+    def test_bool_literal(self):
+        t = nodes.BoolLiteral(value=True)
+        self.assertTrue(t.value)
+        f = nodes.BoolLiteral(value=False)
+        self.assertFalse(f.value)
+
     def test_is_valid(self):
         iv = nodes.IsValid(
             header_ref=nodes.FieldAccess(path=("hdr", "ipv4")),

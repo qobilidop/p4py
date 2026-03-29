@@ -1,7 +1,6 @@
 """Faithful basic_routing-bmv2 in P4Py DSL.
 
 1:1 translation of p4lang/p4c testdata/p4_16_samples/basic_routing-bmv2.p4.
-Remaining differences from upstream are tracked as TODOs.
 
 See the original:
 https://github.com/p4lang/p4c/blob/main/testdata/p4_16_samples/basic_routing-bmv2.p4
@@ -99,18 +98,14 @@ def ingress(hdr, meta, std_meta):
     def set_vrf(vrf: p4.bit(12)):
         meta.ingress_metadata.vrf = vrf
 
-    # TODO: Upstream has actions=[set_bd] only (no on_miss).
     port_mapping = p4.table(
         key={std_meta.ingress_port: p4.exact},
-        actions=[on_miss, set_bd],
-        default_action=on_miss,
+        actions=[set_bd],
     )
 
-    # TODO: Upstream has actions=[set_vrf] only (no on_miss).
     bd = p4.table(
         key={meta.ingress_metadata.bd: p4.exact},
-        actions=[on_miss, set_vrf],
-        default_action=on_miss,
+        actions=[set_vrf],
     )
 
     @p4.action
@@ -156,11 +151,10 @@ def ingress(hdr, meta, std_meta):
         nexthop.apply()
 
 
-# TODO: Upstream uses condition=true, not hdr.ipv4.isValid().
 @p4.control
 def verifyChecksum(hdr, meta):
     v1model.verify_checksum(
-        condition=hdr.ipv4.isValid(),
+        condition=True,
         data=[
             hdr.ipv4.version,
             hdr.ipv4.ihl,
@@ -182,7 +176,7 @@ def verifyChecksum(hdr, meta):
 @p4.control
 def computeChecksum(hdr, meta):
     v1model.update_checksum(
-        condition=hdr.ipv4.isValid(),
+        condition=True,
         data=[
             hdr.ipv4.version,
             hdr.ipv4.ihl,

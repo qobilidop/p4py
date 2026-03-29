@@ -54,6 +54,11 @@ class IntLiteral:
 
 
 @dataclass(frozen=True)
+class BoolLiteral:
+    value: bool
+
+
+@dataclass(frozen=True)
 class ArithOp:
     op: str  # '+' or '-'
     left: Expression
@@ -65,7 +70,7 @@ class IsValid:
     header_ref: FieldAccess
 
 
-Expression = FieldAccess | IntLiteral | ArithOp | IsValid
+Expression = FieldAccess | IntLiteral | BoolLiteral | ArithOp | IsValid
 
 
 # --- Statements ---

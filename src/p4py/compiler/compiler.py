@@ -109,6 +109,8 @@ def _ast_to_field_access(node: ast.expr) -> nodes.FieldAccess:
 
 def _ast_to_expression(node: ast.expr) -> nodes.Expression:
     """Convert an AST expression to an IR Expression."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, bool):
+        return nodes.BoolLiteral(value=node.value)
     if isinstance(node, ast.Constant) and isinstance(node.value, int):
         return nodes.IntLiteral(value=node.value)
     if isinstance(node, (ast.Attribute, ast.Name)):

@@ -60,7 +60,7 @@ parser ParserImpl(packet_in pkt,
 control verifyChecksum(inout headers_t hdr, inout metadata_t meta) {
     apply {
         verify_checksum(
-            hdr.ipv4.isValid(),
+            true,
             { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.diffserv, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr },
             hdr.ipv4.hdrChecksum,
             HashAlgorithm.csum16);
@@ -95,10 +95,8 @@ control ingress(inout headers_t hdr,
             std_meta.ingress_port: exact;
         }
         actions = {
-            on_miss;
             set_bd;
         }
-        default_action = on_miss();
     }
 
     table bd {
@@ -106,10 +104,8 @@ control ingress(inout headers_t hdr,
             meta.ingress_metadata.bd: exact;
         }
         actions = {
-            on_miss;
             set_vrf;
         }
-        default_action = on_miss();
     }
 
     table ipv4_fib {
@@ -191,7 +187,7 @@ control egress(inout headers_t hdr,
 control computeChecksum(inout headers_t hdr, inout metadata_t meta) {
     apply {
         update_checksum(
-            hdr.ipv4.isValid(),
+            true,
             { hdr.ipv4.version, hdr.ipv4.ihl, hdr.ipv4.diffserv, hdr.ipv4.totalLen, hdr.ipv4.identification, hdr.ipv4.flags, hdr.ipv4.fragOffset, hdr.ipv4.ttl, hdr.ipv4.protocol, hdr.ipv4.srcAddr, hdr.ipv4.dstAddr },
             hdr.ipv4.hdrChecksum,
             HashAlgorithm.csum16);

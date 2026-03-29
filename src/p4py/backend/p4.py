@@ -119,11 +119,12 @@ def _emit_table(lines: list[str], t: nodes.TableDecl) -> None:
     for action_name in t.actions:
         lines.append(f"            {action_name};")
     lines.append("        }")
-    if t.default_action_args:
-        args = ", ".join(_emit_expression(a) for a in t.default_action_args)
-        lines.append(f"        default_action = {t.default_action}({args});")
-    else:
-        lines.append(f"        default_action = {t.default_action}();")
+    if t.default_action:
+        if t.default_action_args:
+            args = ", ".join(_emit_expression(a) for a in t.default_action_args)
+            lines.append(f"        default_action = {t.default_action}({args});")
+        else:
+            lines.append(f"        default_action = {t.default_action}();")
     lines.append("    }")
     lines.append("")
 
@@ -275,6 +276,8 @@ def _emit_expression(expr: nodes.Expression) -> str:
     """Emit an expression."""
     if isinstance(expr, nodes.FieldAccess):
         return _emit_field_access(expr)
+    if isinstance(expr, nodes.BoolLiteral):
+        return "true" if expr.value else "false"
     if isinstance(expr, nodes.IntLiteral):
         return str(expr.value)
     if isinstance(expr, nodes.ArithOp):
