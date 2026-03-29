@@ -169,6 +169,10 @@ def _run_control(
         externs=externs,
     )
 
+    # Initialize control-local variables
+    for lv in control.local_vars:
+        state.control_locals[lv.name] = lv.init_value
+
     for stmt in control.apply_body:
         _exec_control_statement(state, stmt, ctx)
 
@@ -188,7 +192,8 @@ def _exec_control_statement(
     if isinstance(stmt, ir.TableApply):
         _exec_table_apply(state, stmt.table_name, ctx)
     elif isinstance(stmt, ir.IfElse):
-        if _eval_is_valid(state, stmt.condition):
+        cond_val = _eval_expression(state, stmt.condition, {})
+        if cond_val:
             for s in stmt.then_body:
                 _exec_control_statement(state, s, ctx)
         else:
@@ -368,6 +373,9 @@ def _entry_matches(
             mask = entry.get("mask", {}).get(field_path, 0)
             if (value & mask) != (entry_value & mask):
                 return False
+        elif kind == "optional":
+            if entry_value != value:
+                return False
     return True
 
 
@@ -398,6 +406,14 @@ def _exec_statement(
     if isinstance(stmt, ir.MethodCall):
         if stmt.method == "extract":
             _exec_extract(state, stmt.args[0])
+        elif stmt.method == "count":
+            pass  # Direct counter: no-op in simulation
+        elif stmt.method == "read":
+            # Direct meter: set the target field to GREEN (0)
+            if stmt.args:
+                _set_field(state, stmt.args[0], 0)
+        elif stmt.method == "apply":
+            pass  # Control apply: no-op in simulation (handled at pipeline level)
         else:
             raise ValueError(f"Unknown method: {stmt.method}")
     elif isinstance(stmt, ir.FunctionCall):

@@ -215,6 +215,7 @@ class V1ModelArch(Architecture):
         eng.register_extern("mark_to_drop", self._mark_to_drop(eng))
         eng.register_extern("verify_checksum", self._verify_checksum(eng))
         eng.register_extern("update_checksum", self._update_checksum(eng))
+        eng.register_extern("clone", lambda stmt: None)
 
         eng.run_parser(_get_block(package, "parser"))
 
