@@ -32,12 +32,15 @@ def compile(pipeline) -> ir.Package:
             raise ValueError(f"Unknown block kind: {spec.kind}")
         blocks.append(ir.BlockEntry(name=spec.name, kind=spec.kind, decl=decl))
 
+    sub_controls_ir = _compile_sub_controls(getattr(pipeline, "sub_controls", ()))
+
     return ir.Package(
         arch=arch,
         headers=headers_ir,
         structs=structs_ir,
         blocks=tuple(blocks),
         declarations=declarations_ir,
+        sub_controls=sub_controls_ir,
     )
 
 
@@ -72,6 +75,42 @@ def _compile_declarations(declarations) -> tuple:
                     value=decl._p4_value,
                 )
             )
+    return tuple(result)
+
+
+def _compile_sub_controls(sub_controls) -> tuple[ir.ControlDecl, ...]:
+    """Compile sub-control specs into ControlDecl IR nodes."""
+    result = []
+    for spec in sub_controls:
+        decl = _compile_control(spec)
+        param_types = _extract_param_types(spec)
+        # Replace the ControlDecl with one that includes param_types.
+        if param_types:
+            decl = ir.ControlDecl(
+                name=decl.name,
+                actions=decl.actions,
+                tables=decl.tables,
+                apply_body=decl.apply_body,
+                param_names=decl.param_names,
+                direct_counters=decl.direct_counters,
+                direct_meters=decl.direct_meters,
+                local_vars=decl.local_vars,
+                param_types=param_types,
+            )
+        result.append(decl)
+    return tuple(result)
+
+
+def _extract_param_types(spec) -> tuple[tuple[str, str], ...]:
+    """Extract (direction, type_name) pairs from a spec's annotations."""
+    from p4py.lang import _DirectedType
+
+    result = []
+    for ann in spec._p4_annotations.values():
+        if isinstance(ann, _DirectedType):
+            result.append((ann.direction, ann.type_ref._p4_name))
+        elif hasattr(ann, "_p4_name"):
+            result.append(("", ann._p4_name))
     return tuple(result)
 
 

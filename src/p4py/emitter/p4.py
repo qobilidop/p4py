@@ -35,6 +35,9 @@ def emit(package: ir.Package) -> str:
     for s in package.structs:
         _emit_struct(lines, s)
 
+    for sc in package.sub_controls:
+        _emit_sub_control(lines, sc)
+
     struct_names = _derive_struct_names(package)
 
     for spec in arch.pipeline:
@@ -68,6 +71,49 @@ def _derive_struct_names(package: ir.Package) -> dict[str, str]:
     if len(package.structs) > 1:
         names["metadata"] = package.structs[-1].name
     return names
+
+
+def _emit_sub_control(lines: list[str], c: ir.ControlDecl) -> None:
+    """Emit a sub-control with its own signature (not architecture-defined)."""
+    sig_parts = []
+    param_names = c.param_names
+    for i, pname in enumerate(param_names):
+        if i < len(c.param_types):
+            direction, type_name = c.param_types[i]
+            if direction:
+                sig_parts.append(f"{direction} {type_name} {pname}")
+            else:
+                sig_parts.append(f"{type_name} {pname}")
+        else:
+            sig_parts.append(pname)
+
+    prefix = f"control {c.name}("
+    padding = " " * len(prefix)
+    sig = prefix + (",\n" + padding).join(sig_parts) + ")"
+
+    lines.append(sig + " {")
+    for lv in c.local_vars:
+        lines.append(f"    bit<{lv.type.width}> {lv.name} = {lv.init_value};")
+        lines.append("")
+    for dc in c.direct_counters:
+        lines.append(f"    direct_counter(CounterType.{dc.counter_type}) {dc.name};")
+        lines.append("")
+    for dm in c.direct_meters:
+        lines.append(
+            f"    direct_meter<{dm.result_type_name}>"
+            f"(MeterType.{dm.meter_type}) {dm.name};"
+        )
+        lines.append("")
+    for action in c.actions:
+        _emit_action(lines, action)
+    for table in c.tables:
+        _emit_table(lines, table)
+    lines.append("    apply {")
+    for stmt in c.apply_body:
+        _emit_block_statement(lines, stmt, indent=8)
+    lines.append("    }")
+    lines.append("}")
+    lines.append("")
 
 
 def _boilerplate_name(block_name: str) -> str:

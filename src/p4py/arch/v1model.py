@@ -299,6 +299,7 @@ class V1Switch:
     compute_checksum: _Spec | None = None
     deparser: _Spec | None = None
     declarations: tuple = ()
+    sub_controls: tuple = ()
 
     def __post_init__(self) -> None:
         self.arch: Architecture = _V1MODEL_ARCH

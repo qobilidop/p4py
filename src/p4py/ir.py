@@ -317,6 +317,7 @@ class ControlDecl:
     direct_counters: tuple[DirectCounter, ...] = ()
     direct_meters: tuple[DirectMeter, ...] = ()
     local_vars: tuple[LocalVarDecl, ...] = ()
+    param_types: tuple[tuple[str, str], ...] = ()  # (direction, type_name) pairs
 
 
 # --- Deparser ---
@@ -346,3 +347,4 @@ class Package:
     structs: tuple[StructType, ...]
     blocks: tuple[BlockEntry, ...]
     declarations: tuple = ()
+    sub_controls: tuple[ControlDecl, ...] = ()
