@@ -110,8 +110,8 @@ def simulate(
     )
 
 
-def _run_parser(state: _SimState, parser: nodes.ParserDecl) -> None:
-    """Execute the parser state machine."""
+def _run_parser(state: _SimState, parser: nodes.ParserDecl) -> str:
+    """Execute the parser state machine. Returns terminal state ('accept' or 'reject')."""
     states = {s.name: s for s in parser.states}
     current = parser.states[0].name  # Start state is always first.
 
@@ -126,6 +126,8 @@ def _run_parser(state: _SimState, parser: nodes.ParserDecl) -> None:
         elif isinstance(transition, nodes.TransitionSelect):
             field_val = _eval_expression(state, transition.field, {})
             current = _match_select(transition.cases, field_val)
+
+    return current
 
 
 def _match_select(cases: tuple[nodes.SelectCase, ...], value: int) -> str:

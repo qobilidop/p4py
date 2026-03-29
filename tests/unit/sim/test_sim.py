@@ -582,5 +582,87 @@ class TestSimulator(absltest.TestCase):
         self.assertEqual(result.egress_port, 7)
 
 
+class TestParserRejectDetection(absltest.TestCase):
+    def test_run_parser_returns_accept(self):
+        """_run_parser returns 'accept' for a valid packet."""
+        from p4py.sim.simulator import _run_parser, _SimState, _HeaderInstance
+        from p4py.ir import nodes
+
+        eth_type = nodes.HeaderType(
+            name="ethernet_t",
+            fields=(
+                nodes.HeaderField("dstAddr", nodes.BitType(48)),
+                nodes.HeaderField("srcAddr", nodes.BitType(48)),
+                nodes.HeaderField("etherType", nodes.BitType(16)),
+            ),
+        )
+        parser = nodes.ParserDecl(
+            name="prs",
+            states=(
+                nodes.ParserState(
+                    name="start",
+                    body=(
+                        nodes.MethodCall(
+                            object=nodes.FieldAccess(("p",)),
+                            method="extract",
+                            args=(nodes.FieldAccess(("headers", "ethernet")),),
+                        ),
+                    ),
+                    transition=nodes.Transition(next_state="accept"),
+                ),
+            ),
+        )
+        state = _SimState(
+            packet_bytes=bytearray(b"\x00" * 14),
+            cursor=0,
+            headers={"ethernet": _HeaderInstance(type_info=eth_type)},
+            metadata={},
+            std_meta={},
+            program=None,
+        )
+        result = _run_parser(state, parser)
+        self.assertEqual(result, "accept")
+
+    def test_run_parser_returns_accept_on_short_packet(self):
+        """_run_parser returns 'accept' even with short packet (header stays invalid)."""
+        from p4py.sim.simulator import _run_parser, _SimState, _HeaderInstance
+        from p4py.ir import nodes
+
+        eth_type = nodes.HeaderType(
+            name="ethernet_t",
+            fields=(
+                nodes.HeaderField("dstAddr", nodes.BitType(48)),
+                nodes.HeaderField("srcAddr", nodes.BitType(48)),
+                nodes.HeaderField("etherType", nodes.BitType(16)),
+            ),
+        )
+        parser = nodes.ParserDecl(
+            name="prs",
+            states=(
+                nodes.ParserState(
+                    name="start",
+                    body=(
+                        nodes.MethodCall(
+                            object=nodes.FieldAccess(("p",)),
+                            method="extract",
+                            args=(nodes.FieldAccess(("headers", "ethernet")),),
+                        ),
+                    ),
+                    transition=nodes.Transition(next_state="accept"),
+                ),
+            ),
+        )
+        state = _SimState(
+            packet_bytes=bytearray(b"\x00" * 5),
+            cursor=0,
+            headers={"ethernet": _HeaderInstance(type_info=eth_type)},
+            metadata={},
+            std_meta={},
+            program=None,
+        )
+        result = _run_parser(state, parser)
+        self.assertEqual(result, "accept")
+
+
 if __name__ == "__main__":
     absltest.main()
