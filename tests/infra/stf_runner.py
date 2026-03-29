@@ -155,12 +155,20 @@ def _parse_stf_add_to_sim(args: str, table_entries: dict[str, list[dict]]) -> No
             name, value = param.strip().split(":", 1)
             action_args[name.strip()] = int(value.strip(), 0)
 
-    # Build key dict.
+    # Build key dict, extracting LPM prefix lengths.
     key_dict: dict[str, int] = {}
+    prefix_len_dict: dict[str, int] = {}
     for field, value in key_pairs:
-        key_dict[field] = int(value, 0)
+        if "/" in value:
+            val_str, plen_str = value.rsplit("/", 1)
+            key_dict[field] = int(val_str, 0)
+            prefix_len_dict[field] = int(plen_str)
+        else:
+            key_dict[field] = int(value, 0)
 
-    entry = {"key": key_dict, "action": action_name, "args": action_args}
+    entry: dict = {"key": key_dict, "action": action_name, "args": action_args}
+    if prefix_len_dict:
+        entry["prefix_len"] = prefix_len_dict
     table_entries.setdefault(table, []).append(entry)
 
 

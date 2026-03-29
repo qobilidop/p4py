@@ -1,11 +1,27 @@
-# LPM routing: 10.0.0.0/24 → port 1, 10.0.0.0/8 → port 2
-add ingress.ipv4_lpm ingress.forward(port:1) hdr.ipv4.dstAddr:0x0A000000/24
-add ingress.ipv4_lpm ingress.forward(port:2) hdr.ipv4.dstAddr:0x0A000000/8
+# Port mapping and bridge domain
+add ingress.port_mapping ingress.set_bd(bd:10) std_meta.ingress_port:0
 
-# Packet to 10.0.0.1 matches /24 (longest prefix) → port 1, TTL 64→63
-packet 0 000000000001 000000000002 0800 45000014 00000000 40060000 0A000001 0A000001
-expect 1 000000000001 000000000002 0800 45000014 00000000 3F060000 0A000001 0A000001
+# BD to VRF
+add ingress.bd_table ingress.set_vrf(vrf:1) meta.bd:10
 
-# Packet to 10.1.0.1 matches /8 only → port 2, TTL 64→63
+# Exact FIB: 10.0.0.2 → nexthop 1
+add ingress.ipv4_fib ingress.fib_hit_nexthop(nexthop_index:1) hdr.ipv4.dstAddr:0x0A000002
+
+# LPM FIB: 10.0.0.0/8 → nexthop 2
+add ingress.ipv4_fib_lpm ingress.fib_hit_nexthop(nexthop_index:2) hdr.ipv4.dstAddr:0x0A000000/8
+
+# Nexthop resolution
+add ingress.nexthop ingress.set_egress_details(egress_spec:5) meta.nexthop_index:1
+add ingress.nexthop ingress.set_egress_details(egress_spec:7) meta.nexthop_index:2
+
+# MAC rewrite (egress)
+add egress.rewrite_mac_table egress.rewrite_mac(smac:0x00000000AA01, dmac:0x00000000BB01) meta.nexthop_index:1
+add egress.rewrite_mac_table egress.rewrite_mac(smac:0x00000000AA02, dmac:0x00000000BB02) meta.nexthop_index:2
+
+# Packet to 10.0.0.2: exact FIB → nexthop 1 → port 5, MAC rewrite, TTL 64→63
+packet 0 000000000001 000000000002 0800 45000014 00000000 40060000 0A000001 0A000002
+expect 5 00000000BB01 00000000AA01 0800 45000014 00000000 3F060000 0A000001 0A000002
+
+# Packet to 10.1.0.1: LPM FIB → nexthop 2 → port 7, MAC rewrite, TTL 64→63
 packet 0 000000000001 000000000002 0800 45000014 00000000 40060000 0A000001 0A010001
-expect 2 000000000001 000000000002 0800 45000014 00000000 3F060000 0A000001 0A010001
+expect 7 00000000BB02 00000000AA02 0800 45000014 00000000 3F060000 0A000001 0A010001

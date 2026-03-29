@@ -134,6 +134,26 @@ class TestStfToSimInputs:
         result = stf_to_sim_inputs(stf)
         assert result.expects[0].pattern == "aabb"
 
+    def test_lpm_prefix_notation(self):
+        stf = (
+            "add ingress.ipv4_lpm ingress.forward(port:1)"
+            " hdr.ipv4.dstAddr:0x0A000000/24\n"
+            "packet 0 AA\n"
+        )
+        result = stf_to_sim_inputs(stf)
+        entry = result.table_entries["ipv4_lpm"][0]
+        assert entry["key"] == {"hdr.ipv4.dstAddr": 0x0A000000}
+        assert entry["prefix_len"] == {"hdr.ipv4.dstAddr": 24}
+        assert entry["action"] == "forward"
+        assert entry["args"] == {"port": 1}
+
+    def test_mixed_exact_and_lpm_keys(self):
+        stf = "add T A(p:1) k1:0xAA k2:0xBB/16\npacket 0 AA\n"
+        result = stf_to_sim_inputs(stf)
+        entry = result.table_entries["T"][0]
+        assert entry["key"] == {"k1": 0xAA, "k2": 0xBB}
+        assert entry["prefix_len"] == {"k2": 16}
+
     def test_drop_test_no_expect(self):
         stf = "add T A()\npacket 0 AABB\n"
         result = stf_to_sim_inputs(stf)
