@@ -316,6 +316,129 @@ control vlan_untag(headers,
     }
 }
 
+control acl_pre_ingress(in headers_t headers,
+                        inout local_metadata_t local_metadata,
+                        in standard_metadata_t standard_metadata) {
+    bit<6> dscp = 0;
+
+    bit<2> ecn = 0;
+
+    bit<8> ip_protocol = 0;
+
+    bool set_outer_vlan_id_action_applied = false;
+
+    bit<12> set_outer_vlan_id_action_vlan_id = 0;
+
+    direct_counter(CounterType.packets_and_bytes) acl_pre_ingress_counter;
+
+    direct_counter(CounterType.packets_and_bytes) acl_pre_ingress_vlan_counter;
+
+    direct_counter(CounterType.packets_and_bytes) acl_pre_ingress_metadata_counter;
+
+    action set_vrf(vrf_id_t vrf_id) {
+        local_metadata.vrf_id = vrf_id;
+        acl_pre_ingress_counter.count();
+    }
+
+    action set_outer_vlan_id(vlan_id_t vlan_id) {
+        set_outer_vlan_id_action_applied = true;
+        set_outer_vlan_id_action_vlan_id = vlan_id;
+        acl_pre_ingress_vlan_counter.count();
+    }
+
+    action set_acl_metadata(acl_metadata_t acl_metadata) {
+        local_metadata.acl_metadata = acl_metadata;
+        acl_pre_ingress_metadata_counter.count();
+    }
+
+    action set_outer_vlan_id_and_acl_metadata(vlan_id_t vlan_id, acl_metadata_t acl_metadata) {
+        set_outer_vlan_id_action_applied = true;
+        set_outer_vlan_id_action_vlan_id = vlan_id;
+        local_metadata.acl_metadata = acl_metadata;
+        acl_pre_ingress_vlan_counter.count();
+    }
+
+    table acl_pre_ingress_table {
+        key = {
+            headers.ipv4.isValid() || headers.ipv6.isValid(): optional;
+            headers.ipv4.isValid(): optional;
+            headers.ipv6.isValid(): optional;
+            headers.ethernet.src_addr: ternary;
+            headers.ipv4.dst_addr: ternary;
+            headers.ipv6.dst_addr[127:64]: ternary;
+            dscp: ternary;
+            ecn: ternary;
+            local_metadata.ingress_port: optional;
+        }
+        actions = {
+            set_vrf;
+            NoAction;
+        }
+        default_action = NoAction();
+        counters = acl_pre_ingress_counter;
+    }
+
+    table acl_pre_ingress_vlan_table {
+        key = {
+            headers.ipv4.isValid() || headers.ipv6.isValid(): optional;
+            headers.ipv4.isValid(): optional;
+            headers.ipv6.isValid(): optional;
+            headers.ethernet.ether_type: ternary;
+            local_metadata.vlan_id: ternary;
+        }
+        actions = {
+            set_outer_vlan_id;
+            set_outer_vlan_id_and_acl_metadata;
+            NoAction;
+        }
+        default_action = NoAction();
+        counters = acl_pre_ingress_vlan_counter;
+    }
+
+    table acl_pre_ingress_metadata_table {
+        key = {
+            headers.ipv4.isValid() || headers.ipv6.isValid(): optional;
+            headers.ipv4.isValid(): optional;
+            headers.ipv6.isValid(): optional;
+            ip_protocol: ternary;
+            local_metadata.l4_dst_port: ternary;
+            headers.icmp.type: ternary;
+            dscp: ternary;
+            ecn: ternary;
+            local_metadata.ingress_port: optional;
+        }
+        actions = {
+            set_acl_metadata;
+            set_outer_vlan_id;
+            NoAction;
+        }
+        default_action = NoAction();
+        counters = acl_pre_ingress_metadata_counter;
+    }
+
+    apply {
+        if (headers.ipv4.isValid()) {
+            dscp = headers.ipv4.dscp;
+            ecn = headers.ipv4.ecn;
+            ip_protocol = headers.ipv4.protocol;
+        } else if (headers.ipv6.isValid()) {
+            dscp = headers.ipv6.dscp;
+            ecn = headers.ipv6.ecn;
+            if (headers.ipv6.next_header == 0 && headers.hop_by_hop_options.isValid()) {
+                ip_protocol = headers.hop_by_hop_options.next_header;
+            } else {
+                ip_protocol = headers.ipv6.next_header;
+            }
+        }
+        acl_pre_ingress_vlan_table.apply();
+        acl_pre_ingress_metadata_table.apply();
+        acl_pre_ingress_table.apply();
+        if (set_outer_vlan_id_action_applied && local_metadata.input_packet_is_vlan_tagged) {
+            local_metadata.vlan_id = set_outer_vlan_id_action_vlan_id;
+        }
+    }
+}
+
 control ingress_vlan_checks(headers,
                             local_metadata,
                             standard_metadata) {
@@ -377,6 +500,242 @@ control l3_admit(headers,
             local_metadata.admit_to_l3 = false;
         } else {
             l3_admit_table.apply();
+        }
+    }
+}
+
+control acl_ingress(in headers_t headers,
+                    inout local_metadata_t local_metadata,
+                    inout standard_metadata_t standard_metadata) {
+    bit<8> ttl = 0;
+
+    bit<6> dscp = 0;
+
+    bit<2> ecn = 0;
+
+    bit<8> ip_protocol = 0;
+
+    bool cancel_copy = false;
+
+    direct_counter(CounterType.packets_and_bytes) acl_ingress_counter;
+
+    direct_counter(CounterType.packets_and_bytes) acl_ingress_qos_counter;
+
+    direct_counter(CounterType.packets_and_bytes) acl_ingress_counting_counter;
+
+    direct_counter(CounterType.packets_and_bytes) acl_ingress_security_counter;
+
+    direct_meter<MeterColor_t>(MeterType.bytes) acl_ingress_meter;
+
+    direct_meter<MeterColor_t>(MeterType.bytes) acl_ingress_qos_meter;
+
+    action acl_copy(cpu_queue_t qos_queue) {
+        acl_ingress_counter.count();
+        local_metadata.marked_to_copy = true;
+    }
+
+    action acl_trap(cpu_queue_t qos_queue) {
+        acl_copy(qos_queue);
+        local_metadata.acl_drop = true;
+    }
+
+    action acl_forward() {
+    }
+
+    action acl_count() {
+        acl_ingress_counting_counter.count();
+    }
+
+    action acl_mirror(mirror_session_id_t mirror_session_id) {
+        acl_ingress_counter.count();
+        local_metadata.marked_to_mirror = true;
+        local_metadata.mirror_session_id = mirror_session_id;
+    }
+
+    action set_qos_queue_and_cancel_copy_above_rate_limit(cpu_queue_t qos_queue) {
+        acl_ingress_qos_meter.read(local_metadata.color);
+    }
+
+    action set_cpu_queue_and_cancel_copy(cpu_queue_t cpu_queue) {
+        cancel_copy = true;
+    }
+
+    action set_dscp_and_queues_and_deny_above_rate_limit(bit<6> dscp, cpu_queue_t cpu_queue, multicast_queue_t green_multicast_queue, multicast_queue_t red_multicast_queue, unicast_queue_t green_unicast_queue, unicast_queue_t red_unicast_queue) {
+        acl_ingress_qos_meter.read(local_metadata.color);
+        local_metadata.enable_dscp_rewrite = true;
+        local_metadata.packet_rewrites.dscp = dscp;
+    }
+
+    action set_cpu_queue_and_deny_above_rate_limit(cpu_queue_t cpu_queue) {
+        acl_ingress_qos_meter.read(local_metadata.color);
+    }
+
+    action set_cpu_queue(cpu_queue_t cpu_queue) {
+    }
+
+    action set_forwarding_queues(multicast_queue_t green_multicast_queue, multicast_queue_t red_multicast_queue, unicast_queue_t green_unicast_queue, unicast_queue_t red_unicast_queue) {
+        acl_ingress_qos_meter.read(local_metadata.color);
+    }
+
+    action acl_deny() {
+        cancel_copy = true;
+        local_metadata.acl_drop = true;
+    }
+
+    action acl_drop() {
+        local_metadata.acl_drop = true;
+    }
+
+    action redirect_to_nexthop(nexthop_id_t nexthop_id) {
+        local_metadata.acl_ingress_nexthop_redirect = true;
+        local_metadata.nexthop_id_valid = true;
+        local_metadata.nexthop_id_value = nexthop_id;
+        local_metadata.wcmp_group_id_valid = false;
+        standard_metadata.mcast_grp = 0;
+    }
+
+    action redirect_to_ipmc_group(multicast_group_id_t multicast_group_id) {
+        standard_metadata.mcast_grp = multicast_group_id;
+        local_metadata.acl_ingress_ipmc_redirect = true;
+        local_metadata.nexthop_id_valid = false;
+        local_metadata.wcmp_group_id_valid = false;
+    }
+
+    action redirect_to_port(port_id_t redirect_port) {
+        local_metadata.redirect_port = (bit<9>) redirect_port;
+        local_metadata.redirect_port_valid = true;
+        local_metadata.wcmp_group_id_valid = false;
+        standard_metadata.mcast_grp = 0;
+    }
+
+    action acl_mirror_and_redirect_to_port(mirror_session_id_t mirror_session_id, port_id_t redirect_port) {
+        acl_ingress_counter.count();
+        local_metadata.marked_to_mirror = true;
+        local_metadata.mirror_session_id = mirror_session_id;
+        local_metadata.redirect_port = (bit<9>) redirect_port;
+        local_metadata.redirect_port_valid = true;
+        local_metadata.wcmp_group_id_valid = false;
+        standard_metadata.mcast_grp = 0;
+    }
+
+    action redirect_to_l2mc_group(multicast_group_id_t multicast_group_id) {
+        local_metadata.acl_ingress_l2mc_redirect = true;
+        standard_metadata.mcast_grp = multicast_group_id;
+        local_metadata.nexthop_id_valid = false;
+        local_metadata.wcmp_group_id_valid = false;
+    }
+
+    table acl_ingress_table {
+        key = {
+            headers.ipv4.isValid() || headers.ipv6.isValid(): optional;
+            headers.ipv4.isValid(): optional;
+            headers.ipv6.isValid(): optional;
+            headers.ethernet.ether_type: ternary;
+            headers.ethernet.dst_addr: ternary;
+            headers.ipv4.src_addr: ternary;
+            headers.ipv4.dst_addr: ternary;
+            headers.ipv6.src_addr[127:64]: ternary;
+            headers.ipv6.dst_addr[127:64]: ternary;
+            ttl: ternary;
+            ip_protocol: ternary;
+            headers.icmp.type: ternary;
+            headers.icmp.type: ternary;
+            local_metadata.l4_src_port: ternary;
+            local_metadata.l4_dst_port: ternary;
+            headers.arp.target_proto_addr: ternary;
+            local_metadata.ingress_port: optional;
+            local_metadata.route_metadata: optional;
+            local_metadata.acl_metadata: ternary;
+            local_metadata.vlan_id: ternary;
+        }
+        actions = {
+            acl_copy;
+            acl_trap;
+            acl_forward;
+            acl_mirror;
+            acl_drop;
+            redirect_to_l2mc_group;
+            redirect_to_nexthop;
+            NoAction;
+        }
+        default_action = NoAction();
+        counters = acl_ingress_counter;
+    }
+
+    table acl_ingress_qos_table {
+        key = {
+            headers.ipv4.isValid() || headers.ipv6.isValid(): optional;
+            headers.ipv4.isValid(): optional;
+            headers.ipv6.isValid(): optional;
+            headers.ethernet.ether_type: ternary;
+            ttl: ternary;
+            ip_protocol: ternary;
+            headers.icmp.type: ternary;
+            local_metadata.l4_dst_port: ternary;
+            local_metadata.acl_metadata: ternary;
+            local_metadata.route_metadata: ternary;
+            headers.ethernet.dst_addr: ternary;
+            headers.arp.target_proto_addr: ternary;
+            local_metadata.ingress_port: optional;
+            local_metadata.vlan_id: ternary;
+        }
+        actions = {
+            set_qos_queue_and_cancel_copy_above_rate_limit;
+            set_cpu_queue_and_deny_above_rate_limit;
+            acl_forward;
+            acl_drop;
+            set_cpu_queue;
+            set_dscp_and_queues_and_deny_above_rate_limit;
+            set_forwarding_queues;
+            NoAction;
+        }
+        default_action = NoAction();
+        meters = acl_ingress_qos_meter;
+        counters = acl_ingress_qos_counter;
+    }
+
+    table acl_ingress_mirror_and_redirect_table {
+        key = {
+            local_metadata.ingress_port: optional;
+            local_metadata.acl_metadata: ternary;
+            local_metadata.vlan_id: ternary;
+            headers.ipv4.isValid() || headers.ipv6.isValid(): optional;
+            headers.ipv4.isValid(): optional;
+            headers.ipv6.isValid(): optional;
+            headers.ipv4.dst_addr: ternary;
+            headers.ipv6.dst_addr[127:64]: ternary;
+            local_metadata.vrf_id: optional;
+        }
+        actions = {
+            acl_mirror;
+            acl_mirror_and_redirect_to_port;
+            redirect_to_port;
+            acl_forward;
+            redirect_to_nexthop;
+            redirect_to_ipmc_group;
+            set_cpu_queue_and_cancel_copy;
+            NoAction;
+        }
+        default_action = NoAction();
+    }
+
+    apply {
+        if (headers.ipv4.isValid()) {
+            ttl = headers.ipv4.ttl;
+            dscp = headers.ipv4.dscp;
+            ecn = headers.ipv4.ecn;
+            ip_protocol = headers.ipv4.protocol;
+        } else if (headers.ipv6.isValid()) {
+            ttl = headers.ipv6.hop_limit;
+            dscp = headers.ipv6.dscp;
+            ecn = headers.ipv6.ecn;
+            ip_protocol = headers.ipv6.next_header;
+        }
+        acl_ingress_table.apply();
+        acl_ingress_qos_table.apply();
+        acl_ingress_mirror_and_redirect_table.apply();
+        if (cancel_copy) {
+            local_metadata.marked_to_copy = false;
         }
     }
 }
@@ -644,9 +1003,11 @@ control ingress(inout headers_t headers,
         packet_out_decap.apply(headers, local_metadata, standard_metadata);
         if (!local_metadata.bypass_ingress) {
             vlan_untag.apply(headers, local_metadata, standard_metadata);
+            acl_pre_ingress.apply(headers, local_metadata, standard_metadata);
             ingress_vlan_checks.apply(headers, local_metadata, standard_metadata);
             admit_google_system_mac.apply(headers, local_metadata);
             l3_admit.apply(headers, local_metadata, standard_metadata);
+            acl_ingress.apply(headers, local_metadata, standard_metadata);
         }
     }
 }
