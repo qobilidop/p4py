@@ -635,10 +635,14 @@ def _compile_action(
                 action_params.append(
                     ir.ActionParam(name=arg.arg, type=ir.BitType(width))
                 )
+            # Named type parameter: annotation is ast.Name (e.g., vrf_id_t)
+            elif isinstance(arg.annotation, ast.Name):
+                type_name = arg.annotation.id
+                action_params.append(ir.ActionParam(name=arg.arg, type_name=type_name))
             else:
                 raise ValueError(
                     f"Action param '{arg.arg}' must be annotated"
-                    " with p4.bit(W) or p4.bool"
+                    " with p4.bit(W), p4.bool, or a named type"
                 )
 
     body = tuple(

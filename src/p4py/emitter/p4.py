@@ -250,7 +250,9 @@ def _emit_parser_state(lines: list[str], state: ir.ParserState) -> None:
 def _emit_action(lines: list[str], a: ir.ActionDecl) -> None:
     param_strs = []
     for p in a.params:
-        if isinstance(p.type, ir.BoolType):
+        if p.type_name:
+            param_strs.append(f"{p.type_name} {p.name}")
+        elif isinstance(p.type, ir.BoolType):
             param_strs.append(f"bool {p.name}")
         else:
             param_strs.append(f"bit<{p.type.width}> {p.name}")

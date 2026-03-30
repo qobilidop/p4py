@@ -310,7 +310,8 @@ class ParserDecl:
 @dataclass(frozen=True)
 class ActionParam:
     name: str
-    type: BitType | BoolType
+    type: BitType | BoolType | None = None
+    type_name: str | None = None  # Named type (e.g., "vrf_id_t")
 
 
 @dataclass(frozen=True)

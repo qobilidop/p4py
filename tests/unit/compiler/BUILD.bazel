@@ -44,3 +44,12 @@ py_test(
         "@pip//absl_py",
     ],
 )
+
+py_test(
+    name = "test_named_type_param",
+    srcs = ["test_named_type_param.py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
+)
