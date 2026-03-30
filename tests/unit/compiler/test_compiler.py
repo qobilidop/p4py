@@ -558,7 +558,6 @@ class TestCompileExpressions(absltest.TestCase):
         self.assertIsInstance(if_else.condition.left, nodes.LogicalOp)
         self.assertIsInstance(if_else.condition.right, nodes.CompareOp)
 
-
     def test_compile_bitwise_and(self):
         """& compiles to ArithOp('&')."""
 

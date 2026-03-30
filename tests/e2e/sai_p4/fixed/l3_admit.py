@@ -6,8 +6,8 @@ import p4py.lang as p4
 @p4.control
 def admit_google_system_mac(headers, local_metadata):
     local_metadata.admit_to_l3 = (
-        (headers.ethernet.dst_addr & p4.hex(0x010000000000)) == 0
-    )
+        headers.ethernet.dst_addr & p4.hex(0x010000000000)
+    ) == 0
 
 
 @p4.control

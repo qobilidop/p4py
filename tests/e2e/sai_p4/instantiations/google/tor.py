@@ -13,6 +13,7 @@ from tests.e2e.sai_p4.fixed.headers import (
     ipv6_addr_t,
     vlan_id_t,
 )
+from tests.e2e.sai_p4.fixed.l3_admit import admit_google_system_mac, l3_admit
 from tests.e2e.sai_p4.fixed.metadata import (
     MeterColor_t,
     PreservedFieldList,
@@ -243,6 +244,8 @@ def ingress(headers, local_metadata, standard_metadata):
     if not local_metadata.bypass_ingress:
         vlan_untag.apply(headers, local_metadata, standard_metadata)
         ingress_vlan_checks.apply(headers, local_metadata, standard_metadata)
+        admit_google_system_mac.apply(headers, local_metadata)
+        l3_admit.apply(headers, local_metadata, standard_metadata)
 
 
 @p4.control
@@ -338,6 +341,8 @@ main = V1Switch(
         packet_out_decap,
         vlan_untag,
         ingress_vlan_checks,
+        admit_google_system_mac,
+        l3_admit,
         egress_vlan_checks,
         vlan_tag,
     ),

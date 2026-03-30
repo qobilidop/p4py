@@ -346,6 +346,41 @@ control ingress_vlan_checks(headers,
     }
 }
 
+control admit_google_system_mac(headers,
+                                local_metadata) {
+    apply {
+        local_metadata.admit_to_l3 = (headers.ethernet.dst_addr & 0x010000000000) == 0;
+    }
+}
+
+control l3_admit(headers,
+                 local_metadata,
+                 standard_metadata) {
+    action admit_to_l3() {
+        local_metadata.admit_to_l3 = true;
+    }
+
+    table l3_admit_table {
+        key = {
+            headers.ethernet.dst_addr: ternary;
+            local_metadata.ingress_port: optional;
+        }
+        actions = {
+            admit_to_l3;
+            NoAction;
+        }
+        default_action = NoAction();
+    }
+
+    apply {
+        if (local_metadata.marked_to_drop_by_ingress_vlan_checks) {
+            local_metadata.admit_to_l3 = false;
+        } else {
+            l3_admit_table.apply();
+        }
+    }
+}
+
 control egress_vlan_checks(headers,
                            local_metadata,
                            standard_metadata) {
@@ -610,6 +645,8 @@ control ingress(inout headers_t headers,
         if (!local_metadata.bypass_ingress) {
             vlan_untag.apply(headers, local_metadata, standard_metadata);
             ingress_vlan_checks.apply(headers, local_metadata, standard_metadata);
+            admit_google_system_mac.apply(headers, local_metadata);
+            l3_admit.apply(headers, local_metadata, standard_metadata);
         }
     }
 }
