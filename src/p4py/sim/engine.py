@@ -585,6 +585,8 @@ def _eval_expression(
             return left + right
         if expr.op == "-":
             return left - right
+        if expr.op == "&":
+            return left & right
         raise ValueError(f"Unknown op: {expr.op}")
     if isinstance(expr, ir.IsValid):
         return int(_eval_is_valid(state, expr))

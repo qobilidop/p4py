@@ -409,7 +409,10 @@ def _emit_expression(expr: ir.Expression) -> str:
             return _emit_hex_literal(expr.value)
         return str(expr.value)
     if isinstance(expr, ir.ArithOp):
-        return f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
+        inner = f"{_emit_expression(expr.left)} {expr.op} {_emit_expression(expr.right)}"
+        if expr.op == "&":
+            return f"({inner})"
+        return inner
     if isinstance(expr, ir.IsValid):
         return f"{_emit_field_access(expr.header_ref)}.isValid()"
     if isinstance(expr, ir.ListExpression):

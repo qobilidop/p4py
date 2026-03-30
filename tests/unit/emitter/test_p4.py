@@ -141,6 +141,25 @@ class TestEmit(absltest.TestCase):
         self.assertIn(") main;", source)
 
 
+class TestEmitBitwiseAnd(absltest.TestCase):
+    def test_bitwise_and_parenthesized_in_compare(self):
+        """Bitwise AND is parenthesized when inside a comparison."""
+        expr = ir.CompareOp(
+            op="==",
+            left=ir.ArithOp(
+                op="&",
+                left=ir.FieldAccess(path=("hdr", "ethernet", "dstAddr")),
+                right=ir.IntLiteral(value=0x010000000000, hex=True),
+            ),
+            right=ir.IntLiteral(value=0),
+        )
+        result = p4_emitter._emit_expression(expr)
+        self.assertEqual(
+            result,
+            "(hdr.ethernet.dstAddr & 0x010000000000) == 0",
+        )
+
+
 class TestEmitEbpf(absltest.TestCase):
     def test_init_ebpf(self):
         """Compile and emit a minimal eBPF program."""

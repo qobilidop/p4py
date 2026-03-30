@@ -856,6 +856,65 @@ class TestCastAndConstRef(absltest.TestCase):
         )
         self.assertEqual(_eval_expression(state, both_false, {}), 0)
 
+    def test_eval_bitwise_and(self):
+        """ArithOp('&') computes bitwise AND."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        expr = ir.ArithOp(
+            op="&",
+            left=ir.IntLiteral(value=0xFF00),
+            right=ir.IntLiteral(value=0x0F0F),
+        )
+        self.assertEqual(_eval_expression(state, expr, {}), 0x0F00)
+
+    def test_eval_bitwise_and_with_compare(self):
+        """(x & mask) == 0 evaluates correctly."""
+        from p4py import ir
+        from p4py.sim.engine import _eval_expression, _SimState
+
+        pkg = ir.Package(arch=None, headers=(), structs=(), blocks=(), declarations=())
+        state = _SimState(
+            packet_bytes=bytearray(),
+            cursor=0,
+            headers={},
+            metadata={},
+            metadata_widths={},
+            program=pkg,
+        )
+        # 0x00AABB & 0x010000 == 0 -> True (multicast bit not set)
+        expr = ir.CompareOp(
+            op="==",
+            left=ir.ArithOp(
+                op="&",
+                left=ir.IntLiteral(value=0x00AABB),
+                right=ir.IntLiteral(value=0x010000),
+            ),
+            right=ir.IntLiteral(value=0),
+        )
+        self.assertEqual(_eval_expression(state, expr, {}), 1)
+
+        # 0x01AABB & 0x010000 == 0 -> False (multicast bit set)
+        expr2 = ir.CompareOp(
+            op="==",
+            left=ir.ArithOp(
+                op="&",
+                left=ir.IntLiteral(value=0x01AABB),
+                right=ir.IntLiteral(value=0x010000),
+            ),
+            right=ir.IntLiteral(value=0),
+        )
+        self.assertEqual(_eval_expression(state, expr2, {}), 0)
+
     def test_const_ref_unknown_raises(self):
         """ConstRef for unknown constant raises ValueError."""
         from p4py import ir

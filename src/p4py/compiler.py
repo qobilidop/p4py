@@ -289,6 +289,8 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
             op = "+"
         elif isinstance(node.op, ast.Sub):
             op = "-"
+        elif isinstance(node.op, ast.BitAnd):
+            op = "&"
         else:
             raise ValueError(f"Unsupported arithmetic operator: {ast.dump(node.op)}")
         return ir.ArithOp(

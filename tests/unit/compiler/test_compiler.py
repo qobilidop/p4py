@@ -559,6 +559,35 @@ class TestCompileExpressions(absltest.TestCase):
         self.assertIsInstance(if_else.condition.right, nodes.CompareOp)
 
 
+    def test_compile_bitwise_and(self):
+        """& compiles to ArithOp('&')."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            meta.flag = (hdr.ethernet.dstAddr & p4.hex(0x010000000000)) == 0
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+
+        ingress = _get_block(package, "ingress")
+        assign = ingress.apply_body[0]
+        self.assertIsInstance(assign, nodes.Assignment)
+        cmp = assign.value
+        self.assertIsInstance(cmp, nodes.CompareOp)
+        self.assertEqual(cmp.op, "==")
+        self.assertIsInstance(cmp.left, nodes.ArithOp)
+        self.assertEqual(cmp.left.op, "&")
+        self.assertIsInstance(cmp.left.left, nodes.FieldAccess)
+        self.assertIsInstance(cmp.left.right, nodes.IntLiteral)
+        self.assertTrue(cmp.left.right.hex)
+        self.assertEqual(cmp.left.right.value, 0x010000000000)
+        self.assertEqual(cmp.right.value, 0)
+
+
 class TestCompileEbpf(absltest.TestCase):
     def test_compile_init_ebpf(self):
         """Compile a minimal eBPF program to IR."""
