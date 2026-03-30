@@ -309,6 +309,18 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
         return ir.ListExpression(
             elements=tuple(_ast_to_expression(elt) for elt in node.elts)
         )
+    # field[hi:lo] → BitSlice  (Python slice lower=hi, upper=lo in P4 convention)
+    if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice):
+        expr = _ast_to_expression(node.value)
+        hi_node = node.slice.lower  # Python start = P4 hi
+        lo_node = node.slice.upper  # Python stop = P4 lo
+        if (
+            hi_node is not None
+            and lo_node is not None
+            and isinstance(hi_node, ast.Constant)
+            and isinstance(lo_node, ast.Constant)
+        ):
+            return ir.BitSlice(expr=expr, hi=hi_node.value, lo=lo_node.value)
     raise ValueError(f"Unsupported expression: {ast.dump(node)}")
 
 

@@ -175,6 +175,13 @@ class LogicalOp:
     right: Expression
 
 
+@dataclass(frozen=True)
+class BitSlice:
+    expr: Expression
+    hi: int
+    lo: int
+
+
 Expression = (
     FieldAccess
     | IntLiteral
@@ -189,6 +196,7 @@ Expression = (
     | UnaryOp
     | CompareOp
     | LogicalOp
+    | BitSlice
 )
 
 

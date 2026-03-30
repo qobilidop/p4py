@@ -440,6 +440,8 @@ def _emit_expression(expr: ir.Expression) -> str:
             if isinstance(expr.right, ir.LogicalOp) and expr.right.op == "||":
                 right = f"({right})"
         return f"{left} {expr.op} {right}"
+    if isinstance(expr, ir.BitSlice):
+        return f"{_emit_expression(expr.expr)}[{expr.hi}:{expr.lo}]"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 
