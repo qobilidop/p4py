@@ -268,14 +268,7 @@ def _emit_table(lines: list[str], t: ir.TableDecl) -> None:
     lines.append(f"    table {t.name} {{")
     lines.append("        key = {")
     for key in t.keys:
-        if isinstance(key.field, ir.FieldAccess):
-            lines.append(
-                f"            {_emit_field_access(key.field)}: {key.match_kind};"
-            )
-        else:
-            lines.append(
-                f"            {_emit_expression(key.field)}: {key.match_kind};"
-            )
+        lines.append(f"            {_emit_expression(key.field)}: {key.match_kind};")
     lines.append("        }")
     lines.append("        actions = {")
     for action_name in t.actions:

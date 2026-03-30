@@ -268,7 +268,7 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
     lookup_key = {}
     match_kinds = {}
     field_widths = {}
-    for table_key in table.keys:
+    for i, table_key in enumerate(table.keys):
         if isinstance(table_key.field, ir.IsValid):
             field_path = _emit_is_valid_path(table_key.field)
             lookup_key[field_path] = _eval_expression(state, table_key.field, {})
@@ -279,11 +279,17 @@ def _exec_table_apply(state: _SimState, table_name: str, ctx: _ControlContext) -
             lookup_key[field_path] = table_key.field.value
             match_kinds[field_path] = table_key.match_kind
             field_widths[field_path] = table_key.field.width or 32
-        else:
+        elif isinstance(table_key.field, ir.FieldAccess):
             field_path = ".".join(table_key.field.path)
             lookup_key[field_path] = _eval_expression(state, table_key.field, {})
             match_kinds[field_path] = table_key.match_kind
             field_widths[field_path] = _resolve_field_width(state, table_key.field)
+        else:
+            # General expression key (LogicalOp, etc.)
+            field_path = f"__expr_key_{i}"
+            lookup_key[field_path] = _eval_expression(state, table_key.field, {})
+            match_kinds[field_path] = table_key.match_kind
+            field_widths[field_path] = 1
 
     best_match = None
     best_score = -1

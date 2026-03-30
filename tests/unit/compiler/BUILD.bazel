@@ -53,3 +53,12 @@ py_test(
         "@pip//absl_py",
     ],
 )
+
+py_test(
+    name = "test_expression_table_key",
+    srcs = ["test_expression_table_key.py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
+)

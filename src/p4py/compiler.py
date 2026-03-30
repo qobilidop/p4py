@@ -802,21 +802,7 @@ def _compile_table_keys(dict_node: ast.Dict) -> tuple[ir.TableKey, ...]:
     """Compile a dict literal {field: match_kind} into TableKeys."""
     keys = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
-        # Handle isValid() as table key
-        if (
-            isinstance(key_node, ast.Call)
-            and isinstance(key_node.func, ast.Attribute)
-            and key_node.func.attr == "isValid"
-        ):
-            field = ir.IsValid(header_ref=_ast_to_field_access(key_node.func.value))
-        elif (
-            isinstance(key_node, ast.Call)
-            and isinstance(key_node.func, ast.Attribute)
-            and key_node.func.attr == "literal"
-        ):
-            field = _ast_to_expression(key_node)
-        else:
-            field = _ast_to_field_access(key_node)
+        field = _ast_to_expression(key_node)
         # p4.exact → "exact"
         if isinstance(val_node, ast.Attribute):
             match_kind = val_node.attr
