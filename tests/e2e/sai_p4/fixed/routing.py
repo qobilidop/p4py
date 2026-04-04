@@ -28,13 +28,6 @@ from tests.e2e.sai_p4.fixed.metadata import (
     tunnel_id_t,
     wcmp_group_id_t,
 )
-from tests.e2e.sai_p4.instantiations.google.bitwidths import (
-    PORT_BITWIDTH,
-    ROUTER_INTERFACE_ID_BITWIDTH,
-    TUNNEL_ID_BITWIDTH,
-    WCMP_GROUP_ID_BITWIDTH,
-    WCMP_SELECTOR_INPUT_BITWIDTH,
-)
 
 
 # --- File-scope action (shared between routing_lookup and routing_resolution) ---
@@ -185,10 +178,6 @@ def routing_lookup(
 
 # --- routing_resolution control ---
 
-# Size constants from minimum_guaranteed_sizes.h (TOR instantiation).
-WCMP_GROUP_SUM_OF_WEIGHTS_SIZE_TOR = 31296
-
-
 @p4.control
 def routing_resolution(
     headers: p4.in_(headers_t),
@@ -197,10 +186,10 @@ def routing_resolution(
 ):
     # Control-local variables.
     tunnel_id_valid = p4.bool_(False)
-    tunnel_id_value = p4.bit(TUNNEL_ID_BITWIDTH)
+    tunnel_id_value = p4.bit(256)
 
     router_interface_id_valid = p4.bool_(False)
-    router_interface_id_value = p4.bit(ROUTER_INTERFACE_ID_BITWIDTH)
+    router_interface_id_value = p4.bit(256)
 
     neighbor_id_valid = p4.bool_(False)
     neighbor_id_value = p4.bit(128)  # ipv6_addr_t width
@@ -215,7 +204,7 @@ def routing_resolution(
     def unicast_set_port_and_src_mac_and_vlan_id(
         port: port_id_t, src_mac: ethernet_addr_t, vlan_id: vlan_id_t
     ):
-        standard_metadata.egress_spec = p4.cast(p4.bit(PORT_BITWIDTH), port)
+        standard_metadata.egress_spec = p4.cast(p4.bit(9), port)
         local_metadata.packet_rewrites.src_mac = src_mac
         local_metadata.packet_rewrites.vlan_id = vlan_id
 
@@ -310,9 +299,7 @@ def routing_resolution(
     )
 
     wcmp_group_selector = p4.action_selector(
-        v1model.HashAlgorithm.identity,
-        WCMP_GROUP_SUM_OF_WEIGHTS_SIZE_TOR,
-        WCMP_SELECTOR_INPUT_BITWIDTH,
+        v1model.HashAlgorithm.identity, 31296, 16
     )
 
     wcmp_group_table = p4.table(

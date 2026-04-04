@@ -14,7 +14,11 @@ from tests.e2e.sai_p4.fixed.headers import (
     vlan_id_t,
 )
 from tests.e2e.sai_p4.fixed.l3_admit import admit_google_system_mac, l3_admit
-from tests.e2e.sai_p4.fixed.routing import routing_lookup, set_nexthop_id
+from tests.e2e.sai_p4.fixed.routing import (
+    routing_lookup,
+    routing_resolution,
+    set_nexthop_id,
+)
 from tests.e2e.sai_p4.instantiations.google.acl_ingress import acl_ingress
 from tests.e2e.sai_p4.instantiations.google.acl_pre_ingress import acl_pre_ingress
 from tests.e2e.sai_p4.fixed.metadata import (
@@ -252,6 +256,7 @@ def ingress(headers, local_metadata, standard_metadata):
         l3_admit.apply(headers, local_metadata, standard_metadata)
         routing_lookup.apply(headers, local_metadata, standard_metadata)
         acl_ingress.apply(headers, local_metadata, standard_metadata)
+        routing_resolution.apply(headers, local_metadata, standard_metadata)
 
 
 @p4.control
@@ -352,6 +357,7 @@ main = V1Switch(
         l3_admit,
         routing_lookup,
         acl_ingress,
+        routing_resolution,
         egress_vlan_checks,
         vlan_tag,
     ),

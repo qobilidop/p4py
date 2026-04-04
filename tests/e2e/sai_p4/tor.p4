@@ -869,6 +869,157 @@ control acl_ingress(in headers_t headers,
     }
 }
 
+control routing_resolution(in headers_t headers,
+                           inout local_metadata_t local_metadata,
+                           inout standard_metadata_t standard_metadata) {
+    bool tunnel_id_valid = false;
+
+    bit<256> tunnel_id_value = 0;
+
+    bool router_interface_id_valid = false;
+
+    bit<256> router_interface_id_value = 0;
+
+    bool neighbor_id_valid = false;
+
+    bit<128> neighbor_id_value = 0;
+
+    action_selector(HashAlgorithm.identity,
+                    31296,
+                    16) wcmp_group_selector;
+
+    action set_dst_mac(ethernet_addr_t dst_mac) {
+        local_metadata.packet_rewrites.dst_mac = dst_mac;
+    }
+
+    action unicast_set_port_and_src_mac_and_vlan_id(port_id_t port, ethernet_addr_t src_mac, vlan_id_t vlan_id) {
+        standard_metadata.egress_spec = (bit<9>) port;
+        local_metadata.packet_rewrites.src_mac = src_mac;
+        local_metadata.packet_rewrites.vlan_id = vlan_id;
+    }
+
+    action set_port_and_src_mac(port_id_t port, ethernet_addr_t src_mac) {
+        unicast_set_port_and_src_mac_and_vlan_id(port, src_mac, INTERNAL_VLAN_ID);
+    }
+
+    action unicast_set_port_and_src_mac(port_id_t port, ethernet_addr_t src_mac) {
+        unicast_set_port_and_src_mac_and_vlan_id(port, src_mac, INTERNAL_VLAN_ID);
+    }
+
+    action set_ip_nexthop_and_disable_rewrites(router_interface_id_t router_interface_id, ipv6_addr_t neighbor_id, bit<1> disable_decrement_ttl, bit<1> disable_src_mac_rewrite, bit<1> disable_dst_mac_rewrite, bit<1> disable_vlan_rewrite) {
+        router_interface_id_valid = true;
+        router_interface_id_value = router_interface_id;
+        neighbor_id_valid = true;
+        neighbor_id_value = neighbor_id;
+        local_metadata.enable_decrement_ttl = !(bool) disable_decrement_ttl;
+        local_metadata.enable_src_mac_rewrite = !(bool) disable_src_mac_rewrite;
+        local_metadata.enable_dst_mac_rewrite = !(bool) disable_dst_mac_rewrite;
+        local_metadata.enable_vlan_rewrite = !(bool) disable_vlan_rewrite;
+    }
+
+    action set_ip_nexthop(router_interface_id_t router_interface_id, ipv6_addr_t neighbor_id) {
+        set_ip_nexthop_and_disable_rewrites(router_interface_id, neighbor_id, 0, 0, 0, 0);
+    }
+
+    action set_p2p_tunnel_encap_nexthop(tunnel_id_t tunnel_id) {
+        tunnel_id_valid = true;
+        tunnel_id_value = tunnel_id;
+    }
+
+    action mark_for_p2p_tunnel_encap(ipv6_addr_t encap_src_ip, ipv6_addr_t encap_dst_ip, router_interface_id_t router_interface_id) {
+        local_metadata.tunnel_encap_src_ipv6 = encap_src_ip;
+        local_metadata.tunnel_encap_dst_ipv6 = encap_dst_ip;
+        local_metadata.apply_tunnel_encap_at_egress = true;
+        set_ip_nexthop(router_interface_id, encap_dst_ip);
+    }
+
+    table neighbor_table {
+        key = {
+            router_interface_id_value: exact;
+            neighbor_id_value: exact;
+        }
+        actions = {
+            set_dst_mac;
+            NoAction;
+        }
+        default_action = NoAction();
+    }
+
+    table router_interface_table {
+        key = {
+            router_interface_id_value: exact;
+        }
+        actions = {
+            set_port_and_src_mac;
+            unicast_set_port_and_src_mac_and_vlan_id;
+            unicast_set_port_and_src_mac;
+            NoAction;
+        }
+        default_action = NoAction();
+    }
+
+    table nexthop_table {
+        key = {
+            local_metadata.nexthop_id_value: exact;
+        }
+        actions = {
+            set_ip_nexthop;
+            set_p2p_tunnel_encap_nexthop;
+            set_ip_nexthop_and_disable_rewrites;
+            NoAction;
+        }
+        default_action = NoAction();
+    }
+
+    table tunnel_table {
+        key = {
+            tunnel_id_value: exact;
+        }
+        actions = {
+            mark_for_p2p_tunnel_encap;
+            NoAction;
+        }
+        default_action = NoAction();
+    }
+
+    table wcmp_group_table {
+        key = {
+            local_metadata.wcmp_group_id_value: exact;
+            local_metadata.wcmp_selector_input: selector;
+        }
+        actions = {
+            set_nexthop_id(local_metadata);
+            NoAction;
+        }
+        implementation = wcmp_group_selector;
+        default_action = NoAction();
+    }
+
+    apply {
+        if (local_metadata.wcmp_group_id_valid) {
+            wcmp_group_table.apply();
+        }
+        if (local_metadata.nexthop_id_valid) {
+            nexthop_table.apply();
+            if (tunnel_id_valid) {
+                tunnel_table.apply();
+            }
+            if (router_interface_id_valid && neighbor_id_valid) {
+                router_interface_table.apply();
+                neighbor_table.apply();
+            }
+        }
+        if (local_metadata.redirect_port_valid) {
+            standard_metadata.egress_spec = local_metadata.redirect_port;
+        }
+        local_metadata.packet_in_target_egress_port = standard_metadata.egress_spec;
+        local_metadata.packet_in_ingress_port = standard_metadata.ingress_port;
+        if (local_metadata.acl_drop) {
+            mark_to_drop(standard_metadata);
+        }
+    }
+}
+
 control egress_vlan_checks(headers,
                            local_metadata,
                            standard_metadata) {
@@ -1138,6 +1289,7 @@ control ingress(inout headers_t headers,
             l3_admit.apply(headers, local_metadata, standard_metadata);
             routing_lookup.apply(headers, local_metadata, standard_metadata);
             acl_ingress.apply(headers, local_metadata, standard_metadata);
+            routing_resolution.apply(headers, local_metadata, standard_metadata);
         }
     }
 }
