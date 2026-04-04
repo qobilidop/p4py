@@ -96,6 +96,14 @@ class DirectMeter:
     meter_type: str  # "bytes", "packets"
 
 
+@dataclass(frozen=True)
+class ActionSelector:
+    name: str
+    algorithm: str  # e.g., "HashAlgorithm.identity"
+    size: int
+    width: int
+
+
 # --- Expressions ---
 
 
@@ -368,6 +376,7 @@ class ControlDecl:
     param_names: tuple[str, ...] = ()
     direct_counters: tuple[DirectCounter, ...] = ()
     direct_meters: tuple[DirectMeter, ...] = ()
+    action_selectors: tuple[ActionSelector, ...] = ()
     local_vars: tuple[LocalVarDecl, ...] = ()
     param_types: tuple[tuple[str, str], ...] = ()  # (direction, type_name) pairs
 

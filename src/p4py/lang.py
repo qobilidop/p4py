@@ -200,6 +200,28 @@ exact = _MatchKind("exact")
 lpm = _MatchKind("lpm")
 ternary = _MatchKind("ternary")
 optional = _MatchKind("optional")
+selector = _MatchKind("selector")
+
+
+# --- action_selector ---
+
+
+class _ActionSelector:
+    """An action_selector declaration."""
+
+    def __init__(self, algorithm, size: int, width: int) -> None:
+        self._p4_algorithm = repr(algorithm) if hasattr(algorithm, '_p4_name') else str(algorithm)
+        self._p4_size = size
+        self._p4_width = width
+        self._p4_kind = "action_selector"
+
+    def __repr__(self) -> str:
+        return f"action_selector({self._p4_algorithm}, {self._p4_size}, {self._p4_width})"
+
+
+def action_selector(algorithm, size: int, width: int) -> _ActionSelector:
+    """Create a P4 action_selector declaration."""
+    return _ActionSelector(algorithm, size, width)
 
 
 # --- bool ---

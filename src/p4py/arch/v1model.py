@@ -52,6 +52,7 @@ class _HashAlgorithm:
 
 class HashAlgorithm:
     csum16 = _HashAlgorithm("csum16")
+    identity = _HashAlgorithm("identity")
 
 
 class _ChecksumExtern:

@@ -107,3 +107,12 @@ py_test(
         "@pip//absl_py",
     ],
 )
+
+py_test(
+    name = "test_action_selector",
+    srcs = ["test_action_selector.py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
+)

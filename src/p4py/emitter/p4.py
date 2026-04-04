@@ -126,6 +126,8 @@ def _emit_sub_control(lines: list[str], c: ir.ControlDecl) -> None:
             f"(MeterType.{dm.meter_type}) {dm.name};"
         )
         lines.append("")
+    for a_s in c.action_selectors:
+        _emit_action_selector(lines, a_s)
     for action in c.actions:
         _emit_action(lines, action)
     for table in c.tables:
@@ -135,6 +137,17 @@ def _emit_sub_control(lines: list[str], c: ir.ControlDecl) -> None:
         _emit_block_statement(lines, stmt, indent=8)
     lines.append("    }")
     lines.append("}")
+    lines.append("")
+
+
+def _emit_action_selector(lines: list[str], a: ir.ActionSelector) -> None:
+    """Emit an action_selector declaration."""
+    lines.append(
+        f"    action_selector({a.algorithm},\n"
+        f"                    {a.size},\n"
+        f"                    {a.width})"
+        f" {a.name};"
+    )
     lines.append("")
 
 
@@ -171,6 +184,8 @@ def _emit_control_block(lines: list[str], c: ir.ControlDecl, sig: str) -> None:
             f"(MeterType.{dm.meter_type}) {dm.name};"
         )
         lines.append("")
+    for a_s in c.action_selectors:
+        _emit_action_selector(lines, a_s)
     for action in c.actions:
         _emit_action(lines, action)
     for table in c.tables:

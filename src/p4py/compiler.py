@@ -98,6 +98,7 @@ def _compile_sub_controls(sub_controls) -> tuple[ir.ControlDecl, ...]:
                 param_names=decl.param_names,
                 direct_counters=decl.direct_counters,
                 direct_meters=decl.direct_meters,
+                action_selectors=decl.action_selectors,
                 local_vars=decl.local_vars,
                 param_types=param_types,
             )
@@ -589,17 +590,22 @@ def _compile_control(spec) -> ir.ControlDecl:
     apply_body: list[ir.Statement] = []
     direct_counters: list[ir.DirectCounter] = []
     direct_meters: list[ir.DirectMeter] = []
+    action_selectors: list[ir.ActionSelector] = []
     local_vars: list[ir.LocalVarDecl] = []
 
-    # First pass: collect direct counters and meters to build control-local names.
+    # First pass: collect direct counters, meters, and action selectors.
     for node in func_def.body:
         if isinstance(node, ast.Assign) and _is_direct_counter(node):
             direct_counters.append(_compile_direct_counter(node))
         elif isinstance(node, ast.Assign) and _is_direct_meter(node):
             direct_meters.append(_compile_direct_meter(node))
+        elif isinstance(node, ast.Assign) and _is_action_selector(node):
+            action_selectors.append(_compile_action_selector(node))
 
     control_local_names = frozenset(
-        {dc.name for dc in direct_counters} | {dm.name for dm in direct_meters}
+        {dc.name for dc in direct_counters}
+        | {dm.name for dm in direct_meters}
+        | {a_s.name for a_s in action_selectors}
     )
 
     # Second pass: compile all nodes.
@@ -615,10 +621,11 @@ def _compile_control(spec) -> ir.ControlDecl:
             _is_local_var_decl(node) or _is_bool_local_var_decl(node)
         ):
             local_vars.append(_compile_local_var(node))
-        # name = v1model.direct_counter(...) → DirectCounter (already collected)
+        # Already collected in first pass — skip.
         elif (
             (isinstance(node, ast.Assign) and _is_direct_counter(node))
             or (isinstance(node, ast.Assign) and _is_direct_meter(node))
+            or (isinstance(node, ast.Assign) and _is_action_selector(node))
             or isinstance(node, ast.Pass)
         ):
             continue
@@ -634,6 +641,7 @@ def _compile_control(spec) -> ir.ControlDecl:
         param_names=_param_names_ordered(func_def),
         direct_counters=tuple(direct_counters),
         direct_meters=tuple(direct_meters),
+        action_selectors=tuple(action_selectors),
         local_vars=tuple(local_vars),
     )
 
@@ -805,6 +813,30 @@ def _compile_direct_meter(node: ast.Assign) -> ir.DirectMeter:
     )
 
 
+def _is_action_selector(node: ast.Assign) -> bool:
+    """Check if assignment is name = p4.action_selector(...)."""
+    if not isinstance(node.value, ast.Call):
+        return False
+    func = node.value.func
+    return isinstance(func, ast.Attribute) and func.attr == "action_selector"
+
+
+def _compile_action_selector(node: ast.Assign) -> ir.ActionSelector:
+    """Compile name = p4.action_selector(algorithm, size, width)."""
+    name = node.targets[0].id
+    call = node.value
+    # Algorithm: v1model.HashAlgorithm.identity → "HashAlgorithm.identity"
+    algo_node = call.args[0]
+    if isinstance(algo_node, ast.Attribute):
+        # v1model.HashAlgorithm.identity or HashAlgorithm.identity
+        algo = f"HashAlgorithm.{algo_node.attr}"
+    else:
+        raise ValueError(f"Unsupported action_selector algorithm: {ast.dump(algo_node)}")
+    size = call.args[1].value
+    width = call.args[2].value
+    return ir.ActionSelector(name=name, algorithm=algo, size=size, width=width)
+
+
 def _compile_table(node: ast.Assign) -> ir.TableDecl:
     """Compile name = p4.table(...) into a TableDecl."""
     name = node.targets[0].id
@@ -938,7 +970,9 @@ def _compile_const_entries(
 
 
 def _compile_implementation(node: ast.expr) -> str:
-    """Compile implementation = hash_table(64) into a string like 'hash_table(64)'."""
+    """Compile implementation = hash_table(64) or implementation = selector_name."""
+    if isinstance(node, ast.Name):
+        return node.id
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
         name = node.func.attr
         if node.args and isinstance(node.args[0], ast.Constant):
