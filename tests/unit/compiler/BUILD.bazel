@@ -80,3 +80,12 @@ py_test(
         "@pip//absl_py",
     ],
 )
+
+py_test(
+    name = "test_file_scope_action",
+    srcs = ["test_file_scope_action.py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
+)

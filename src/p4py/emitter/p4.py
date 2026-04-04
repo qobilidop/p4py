@@ -35,6 +35,9 @@ def emit(package: ir.Package) -> str:
     for s in package.structs:
         _emit_struct(lines, s)
 
+    for fsa in package.file_scope_actions:
+        _emit_file_scope_action(lines, fsa)
+
     for sc in package.sub_controls:
         _emit_sub_control(lines, sc)
 
@@ -71,6 +74,25 @@ def _derive_struct_names(package: ir.Package) -> dict[str, str]:
     if len(package.structs) > 1:
         names["metadata"] = package.structs[-1].name
     return names
+
+
+def _emit_file_scope_action(lines: list[str], a: ir.ActionDecl) -> None:
+    """Emit a file-scope action (no indentation)."""
+    param_strs = []
+    for p in a.params:
+        prefix = f"{p.direction} " if p.direction else ""
+        if p.type_name:
+            param_strs.append(f"{prefix}{p.type_name} {p.name}")
+        elif isinstance(p.type, ir.BoolType):
+            param_strs.append(f"{prefix}bool {p.name}")
+        else:
+            param_strs.append(f"{prefix}bit<{p.type.width}> {p.name}")
+    params = ", ".join(param_strs)
+    lines.append(f"action {a.name}({params}) {{")
+    for stmt in a.body:
+        lines.append(f"    {_emit_statement(stmt)}")
+    lines.append("}")
+    lines.append("")
 
 
 def _emit_sub_control(lines: list[str], c: ir.ControlDecl) -> None:

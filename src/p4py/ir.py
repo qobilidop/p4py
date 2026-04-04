@@ -400,3 +400,4 @@ class Package:
     blocks: tuple[BlockEntry, ...]
     declarations: tuple = ()
     sub_controls: tuple[ControlDecl, ...] = ()
+    file_scope_actions: tuple[ActionDecl, ...] = ()

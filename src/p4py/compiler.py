@@ -33,6 +33,9 @@ def compile(pipeline) -> ir.Package:
         blocks.append(ir.BlockEntry(name=spec.name, kind=spec.kind, decl=decl))
 
     sub_controls_ir = _compile_sub_controls(getattr(pipeline, "sub_controls", ()))
+    file_scope_actions_ir = _compile_file_scope_actions(
+        getattr(pipeline, "file_scope_actions", ())
+    )
 
     return ir.Package(
         arch=arch,
@@ -41,6 +44,7 @@ def compile(pipeline) -> ir.Package:
         blocks=tuple(blocks),
         declarations=declarations_ir,
         sub_controls=sub_controls_ir,
+        file_scope_actions=file_scope_actions_ir,
     )
 
 
@@ -98,6 +102,16 @@ def _compile_sub_controls(sub_controls) -> tuple[ir.ControlDecl, ...]:
                 param_types=param_types,
             )
         result.append(decl)
+    return tuple(result)
+
+
+def _compile_file_scope_actions(actions) -> tuple[ir.ActionDecl, ...]:
+    """Compile file-scope @p4.action specs into ActionDecl IR nodes."""
+    result = []
+    for spec in actions:
+        func_def = _parse_spec_ast(spec)
+        params = set()  # No block params for file-scope actions
+        result.append(_compile_action(func_def, params))
     return tuple(result)
 
 

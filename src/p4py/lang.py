@@ -298,7 +298,21 @@ class _Sentinel:
         return self._p4_name
 
 
-action = _Sentinel("decorator", "action")
+class _ActionDecorator(_Sentinel):
+    """Works as both @p4.action decorator (file scope) and AST sentinel."""
+
+    def __call__(self, func):
+        source = textwrap.dedent(inspect.getsource(func))
+        annotations = {
+            k: v for k, v in func.__annotations__.items() if k != "return"
+        }
+        return _Spec(
+            kind="action", name=func.__name__, source=source,
+            annotations=annotations,
+        )
+
+
+action = _ActionDecorator("decorator", "action")
 table = _Sentinel("builtin", "table")
 
 

@@ -334,6 +334,7 @@ class V1Switch:
     deparser: _Spec | None = None
     declarations: tuple = ()
     sub_controls: tuple = ()
+    file_scope_actions: tuple = ()
 
     def __post_init__(self) -> None:
         self.arch: Architecture = _V1MODEL_ARCH
