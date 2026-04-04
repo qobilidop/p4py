@@ -685,17 +685,36 @@ def _compile_action(
                 type_arg = arg.annotation.args[0]
                 if isinstance(type_arg, ast.Name):
                     type_name = type_arg.id
+                    action_params.append(
+                        ir.ActionParam(
+                            name=arg.arg, type_name=type_name,
+                            direction=direction,
+                        )
+                    )
                 elif isinstance(type_arg, ast.Attribute):
                     type_name = type_arg.attr
+                    action_params.append(
+                        ir.ActionParam(
+                            name=arg.arg, type_name=type_name,
+                            direction=direction,
+                        )
+                    )
+                elif (
+                    isinstance(type_arg, ast.Call)
+                    and isinstance(type_arg.func, ast.Attribute)
+                    and type_arg.func.attr == "bit"
+                ):
+                    width = type_arg.args[0].value
+                    action_params.append(
+                        ir.ActionParam(
+                            name=arg.arg, type=ir.BitType(width),
+                            direction=direction,
+                        )
+                    )
                 else:
                     raise ValueError(
                         f"Unsupported directed type: {ast.dump(type_arg)}"
                     )
-                action_params.append(
-                    ir.ActionParam(
-                        name=arg.arg, type_name=type_name, direction=direction
-                    )
-                )
             else:
                 raise ValueError(
                     f"Action param '{arg.arg}' must be annotated"
@@ -811,6 +830,27 @@ def _compile_table(node: ast.Assign) -> ir.TableDecl:
                     action_names.append(elt.id)
                 elif isinstance(elt, ast.Attribute):
                     action_names.append(elt.attr)
+                elif isinstance(elt, ast.Call):
+                    # Partial action application: set_nexthop_id(local_metadata)
+                    if isinstance(elt.func, ast.Name):
+                        func_name = elt.func.id
+                    elif isinstance(elt.func, ast.Attribute):
+                        func_name = elt.func.attr
+                    else:
+                        raise ValueError(
+                            f"Unsupported action ref: {ast.dump(elt)}"
+                        )
+                    arg_names = []
+                    for arg in elt.args:
+                        if isinstance(arg, ast.Name):
+                            arg_names.append(arg.id)
+                        else:
+                            raise ValueError(
+                                f"Unsupported partial action arg: {ast.dump(arg)}"
+                            )
+                    action_names.append(
+                        f"{func_name}({', '.join(arg_names)})"
+                    )
                 else:
                     raise ValueError(f"Unsupported action ref: {ast.dump(elt)}")
             actions = tuple(action_names)
