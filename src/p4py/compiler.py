@@ -282,6 +282,16 @@ def _ast_to_expression(node: ast.expr) -> ir.Expression:
         for val in node.values[1:]:
             result = ir.LogicalOp(op=op, left=result, right=_ast_to_expression(val))
         return result
+    # table.apply().hit → TableApplyHit (must precede generic Attribute handler)
+    if (
+        isinstance(node, ast.Attribute)
+        and node.attr == "hit"
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Attribute)
+        and node.value.func.attr == "apply"
+        and isinstance(node.value.func.value, ast.Name)
+    ):
+        return ir.TableApplyHit(table_name=node.value.func.value.id)
     if isinstance(node, (ast.Attribute, ast.Name)):
         return _ast_to_field_access(node)
     if isinstance(node, ast.BinOp):

@@ -62,3 +62,12 @@ py_test(
         "@pip//absl_py",
     ],
 )
+
+py_test(
+    name = "test_table_apply_hit",
+    srcs = ["test_table_apply_hit.py"],
+    deps = [
+        "//src/p4py",
+        "@pip//absl_py",
+    ],
+)

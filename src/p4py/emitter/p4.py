@@ -442,6 +442,8 @@ def _emit_expression(expr: ir.Expression) -> str:
         return f"{left} {expr.op} {right}"
     if isinstance(expr, ir.BitSlice):
         return f"{_emit_expression(expr.expr)}[{expr.hi}:{expr.lo}]"
+    if isinstance(expr, ir.TableApplyHit):
+        return f"{expr.table_name}.apply().hit"
     raise ValueError(f"Cannot emit expression: {expr}")
 
 

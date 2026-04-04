@@ -182,6 +182,11 @@ class BitSlice:
     lo: int
 
 
+@dataclass(frozen=True)
+class TableApplyHit:
+    table_name: str
+
+
 Expression = (
     FieldAccess
     | IntLiteral
@@ -197,6 +202,7 @@ Expression = (
     | CompareOp
     | LogicalOp
     | BitSlice
+    | TableApplyHit
 )
 
 
