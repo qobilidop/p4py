@@ -661,6 +661,27 @@ def _compile_action(
             elif isinstance(arg.annotation, ast.Name):
                 type_name = arg.annotation.id
                 action_params.append(ir.ActionParam(name=arg.arg, type_name=type_name))
+            # p4.inout(type) or p4.in_(type) → directed param
+            elif (
+                isinstance(arg.annotation, ast.Call)
+                and isinstance(arg.annotation.func, ast.Attribute)
+                and arg.annotation.func.attr in ("inout", "in_", "out", "inout_", "out_")
+            ):
+                direction = arg.annotation.func.attr.rstrip("_")
+                type_arg = arg.annotation.args[0]
+                if isinstance(type_arg, ast.Name):
+                    type_name = type_arg.id
+                elif isinstance(type_arg, ast.Attribute):
+                    type_name = type_arg.attr
+                else:
+                    raise ValueError(
+                        f"Unsupported directed type: {ast.dump(type_arg)}"
+                    )
+                action_params.append(
+                    ir.ActionParam(
+                        name=arg.arg, type_name=type_name, direction=direction
+                    )
+                )
             else:
                 raise ValueError(
                     f"Action param '{arg.arg}' must be annotated"

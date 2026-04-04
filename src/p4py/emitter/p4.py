@@ -250,12 +250,13 @@ def _emit_parser_state(lines: list[str], state: ir.ParserState) -> None:
 def _emit_action(lines: list[str], a: ir.ActionDecl) -> None:
     param_strs = []
     for p in a.params:
+        prefix = f"{p.direction} " if p.direction else ""
         if p.type_name:
-            param_strs.append(f"{p.type_name} {p.name}")
+            param_strs.append(f"{prefix}{p.type_name} {p.name}")
         elif isinstance(p.type, ir.BoolType):
-            param_strs.append(f"bool {p.name}")
+            param_strs.append(f"{prefix}bool {p.name}")
         else:
-            param_strs.append(f"bit<{p.type.width}> {p.name}")
+            param_strs.append(f"{prefix}bit<{p.type.width}> {p.name}")
     params = ", ".join(param_strs)
     lines.append(f"    action {a.name}({params}) {{")
     for stmt in a.body:

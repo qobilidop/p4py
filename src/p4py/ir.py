@@ -326,6 +326,7 @@ class ActionParam:
     name: str
     type: BitType | BoolType | None = None
     type_name: str | None = None  # Named type (e.g., "vrf_id_t")
+    direction: str | None = None  # "in", "out", "inout", or None
 
 
 @dataclass(frozen=True)
