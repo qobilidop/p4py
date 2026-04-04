@@ -273,6 +273,11 @@ struct local_metadata_t {
     bool acl_drop;
 }
 
+action set_nexthop_id(inout local_metadata_t local_metadata, nexthop_id_t nexthop_id) {
+    local_metadata.nexthop_id_valid = true;
+    local_metadata.nexthop_id_value = nexthop_id;
+}
+
 control packet_out_decap(headers,
                          local_metadata,
                          standard_metadata) {
@@ -500,6 +505,130 @@ control l3_admit(headers,
             local_metadata.admit_to_l3 = false;
         } else {
             l3_admit_table.apply();
+        }
+    }
+}
+
+control routing_lookup(in headers_t headers,
+                       inout local_metadata_t local_metadata,
+                       inout standard_metadata_t standard_metadata) {
+    action no_action() {
+    }
+
+    action drop() {
+        mark_to_drop(standard_metadata);
+    }
+
+    action set_wcmp_group_id(wcmp_group_id_t wcmp_group_id) {
+        local_metadata.wcmp_group_id_valid = true;
+        local_metadata.wcmp_group_id_value = wcmp_group_id;
+    }
+
+    action set_wcmp_group_id_and_metadata(wcmp_group_id_t wcmp_group_id, route_metadata_t route_metadata) {
+        set_wcmp_group_id(wcmp_group_id);
+        local_metadata.route_metadata = route_metadata;
+    }
+
+    action set_metadata_and_drop(route_metadata_t route_metadata) {
+        local_metadata.route_metadata = route_metadata;
+        mark_to_drop(standard_metadata);
+    }
+
+    action set_nexthop_id_and_metadata(nexthop_id_t nexthop_id, route_metadata_t route_metadata) {
+        local_metadata.nexthop_id_valid = true;
+        local_metadata.nexthop_id_value = nexthop_id;
+        local_metadata.route_metadata = route_metadata;
+    }
+
+    action set_multicast_group_id(multicast_group_id_t multicast_group_id) {
+        standard_metadata.mcast_grp = multicast_group_id;
+    }
+
+    table vrf_table {
+        key = {
+            local_metadata.vrf_id: exact;
+        }
+        actions = {
+            no_action;
+        }
+        default_action = no_action();
+    }
+
+    table ipv4_table {
+        key = {
+            local_metadata.vrf_id: exact;
+            headers.ipv4.dst_addr: lpm;
+        }
+        actions = {
+            drop;
+            set_nexthop_id(local_metadata);
+            set_wcmp_group_id;
+            set_nexthop_id_and_metadata;
+            set_wcmp_group_id_and_metadata;
+            set_metadata_and_drop;
+        }
+        default_action = drop();
+    }
+
+    table ipv6_table {
+        key = {
+            local_metadata.vrf_id: exact;
+            headers.ipv6.dst_addr: lpm;
+        }
+        actions = {
+            drop;
+            set_nexthop_id(local_metadata);
+            set_wcmp_group_id;
+            set_nexthop_id_and_metadata;
+            set_wcmp_group_id_and_metadata;
+            set_metadata_and_drop;
+        }
+        default_action = drop();
+    }
+
+    table ipv4_multicast_table {
+        key = {
+            local_metadata.vrf_id: exact;
+            headers.ipv4.dst_addr: exact;
+        }
+        actions = {
+            set_multicast_group_id;
+        }
+    }
+
+    table ipv6_multicast_table {
+        key = {
+            local_metadata.vrf_id: exact;
+            headers.ipv6.dst_addr: exact;
+        }
+        actions = {
+            set_multicast_group_id;
+        }
+    }
+
+    apply {
+        mark_to_drop(standard_metadata);
+        vrf_table.apply();
+        if (headers.ipv4.isValid()) {
+            if ((headers.ipv4.dst_addr & 4026531840) == 3758096384) {
+                if (headers.ethernet.dst_addr[47:24] == 65630 && headers.ethernet.dst_addr[23:23] == 0) {
+                    if (!local_metadata.marked_to_drop_by_ingress_vlan_checks) {
+                        local_metadata.route_hit = ipv4_multicast_table.apply().hit;
+                    }
+                }
+            } else if (headers.ethernet.dst_addr[40:40] == 0 && local_metadata.admit_to_l3) {
+                local_metadata.route_hit = ipv4_table.apply().hit;
+            }
+        } else if (headers.ipv6.isValid()) {
+            if ((headers.ipv6.dst_addr & 338953138925153547590470800371487866880) == 338953138925153547590470800371487866880) {
+                if (headers.ethernet.dst_addr[47:32] == 13107) {
+                    if (!local_metadata.marked_to_drop_by_ingress_vlan_checks) {
+                        local_metadata.route_hit = ipv6_multicast_table.apply().hit;
+                    }
+                }
+            } else if (headers.ethernet.dst_addr[40:40] == 0 && local_metadata.admit_to_l3) {
+                local_metadata.route_hit = ipv6_table.apply().hit;
+            }
         }
     }
 }
@@ -1007,6 +1136,7 @@ control ingress(inout headers_t headers,
             ingress_vlan_checks.apply(headers, local_metadata, standard_metadata);
             admit_google_system_mac.apply(headers, local_metadata);
             l3_admit.apply(headers, local_metadata, standard_metadata);
+            routing_lookup.apply(headers, local_metadata, standard_metadata);
             acl_ingress.apply(headers, local_metadata, standard_metadata);
         }
     }
