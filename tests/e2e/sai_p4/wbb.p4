@@ -16,15 +16,25 @@ enum bit<2> MeterColor_t {
     RED = 2
 };
 
+@p4runtime_translation("", string)
 type bit<256> nexthop_id_t;
+@p4runtime_translation("", string)
 type bit<256> tunnel_id_t;
+@p4runtime_translation("", string)
 type bit<256> wcmp_group_id_t;
+@p4runtime_translation("", string)
 type bit<256> vrf_id_t;
+@p4runtime_translation("", string)
 type bit<256> router_interface_id_t;
+@p4runtime_translation("", string)
 type bit<9> port_id_t;
+@p4runtime_translation("", string)
 type bit<256> mirror_session_id_t;
+@p4runtime_translation("", string)
 type bit<256> cpu_queue_t;
+@p4runtime_translation("", string)
 type bit<256> unicast_queue_t;
+@p4runtime_translation("", string)
 type bit<256> multicast_queue_t;
 typedef bit<6> route_metadata_t;
 typedef bit<8> acl_metadata_t;

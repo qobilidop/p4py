@@ -2,10 +2,9 @@
 
 import p4py.lang as p4
 from tests.e2e.sai_p4.fixed.headers import ether_type_t
-from tests.e2e.sai_p4.fixed.metadata import port_id_t
 
 # Port constants.
-SAI_P4_CPU_PORT = p4.const(port_id_t, 510, "SAI_P4_CPU_PORT")
+SAI_P4_CPU_PORT = p4.const(p4.bit(9), 510, "SAI_P4_CPU_PORT")
 
 # Ethertype constants.
 ETHERTYPE_IPV4 = p4.const(ether_type_t, 0x0800, "ETHERTYPE_IPV4")

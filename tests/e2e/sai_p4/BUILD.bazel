@@ -35,3 +35,12 @@ golden_test(
     p4_library = ":wbb",
     p4_module = "tests.e2e.sai_p4.instantiations.google.tor",
 )
+
+# Blocked on p4c upgrade: complex key expressions (isValid() || isValid())
+# require @name annotations, but p4c 1.2.5.11 can't parse them.
+p4testgen_test(
+    name = "tor_p4testgen_test",
+    p4_library = ":wbb",
+    p4_module = "tests.e2e.sai_p4.instantiations.google.tor",
+    tags = ["manual"],
+)

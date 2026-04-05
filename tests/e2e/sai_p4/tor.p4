@@ -16,15 +16,25 @@ enum bit<2> MeterColor_t {
     RED = 2
 };
 
+@p4runtime_translation("", string)
 type bit<256> nexthop_id_t;
+@p4runtime_translation("", string)
 type bit<256> tunnel_id_t;
+@p4runtime_translation("", string)
 type bit<256> wcmp_group_id_t;
+@p4runtime_translation("", string)
 type bit<256> vrf_id_t;
+@p4runtime_translation("", string)
 type bit<256> router_interface_id_t;
+@p4runtime_translation("", string)
 type bit<9> port_id_t;
+@p4runtime_translation("", string)
 type bit<256> mirror_session_id_t;
+@p4runtime_translation("", string)
 type bit<256> cpu_queue_t;
+@p4runtime_translation("", string)
 type bit<256> unicast_queue_t;
+@p4runtime_translation("", string)
 type bit<256> multicast_queue_t;
 typedef bit<6> route_metadata_t;
 typedef bit<8> acl_metadata_t;
@@ -35,7 +45,7 @@ const vlan_id_t NO_VLAN_ID = 0;
 const vrf_id_t kDefaultVrf = 0;
 typedef bit<8> ip_protocol_t;
 typedef bit<32> instance_type_t;
-const port_id_t SAI_P4_CPU_PORT = 0x01fe;
+const bit<9> SAI_P4_CPU_PORT = 0x01fe;
 const ether_type_t ETHERTYPE_IPV4 = 0x0800;
 const ether_type_t ETHERTYPE_IPV6 = 0x86dd;
 const ether_type_t ETHERTYPE_ARP = 0x0806;
@@ -278,9 +288,9 @@ action set_nexthop_id(inout local_metadata_t local_metadata, nexthop_id_t nextho
     local_metadata.nexthop_id_value = nexthop_id;
 }
 
-control packet_out_decap(headers,
-                         local_metadata,
-                         standard_metadata) {
+control packet_out_decap(inout headers_t headers,
+                         inout local_metadata_t local_metadata,
+                         inout standard_metadata_t standard_metadata) {
     apply {
         if (headers.packet_out_header.isValid() && headers.packet_out_header.submit_to_ingress == 0) {
             standard_metadata.egress_spec = (bit<9>) headers.packet_out_header.egress_port;
@@ -290,9 +300,9 @@ control packet_out_decap(headers,
     }
 }
 
-control vlan_untag(headers,
-                   local_metadata,
-                   standard_metadata) {
+control vlan_untag(inout headers_t headers,
+                   inout local_metadata_t local_metadata,
+                   inout standard_metadata_t standard_metadata) {
     action disable_vlan_checks() {
         local_metadata.enable_vlan_checks = false;
     }
@@ -444,9 +454,9 @@ control acl_pre_ingress(in headers_t headers,
     }
 }
 
-control ingress_vlan_checks(headers,
-                            local_metadata,
-                            standard_metadata) {
+control ingress_vlan_checks(inout headers_t headers,
+                            inout local_metadata_t local_metadata,
+                            inout standard_metadata_t standard_metadata) {
     bool enable_ingress_vlan_checks = true;
 
     bool ingress_port_is_member_of_vlan = false;
@@ -474,16 +484,16 @@ control ingress_vlan_checks(headers,
     }
 }
 
-control admit_google_system_mac(headers,
-                                local_metadata) {
+control admit_google_system_mac(inout headers_t headers,
+                                inout local_metadata_t local_metadata) {
     apply {
         local_metadata.admit_to_l3 = (headers.ethernet.dst_addr & 0x010000000000) == 0;
     }
 }
 
-control l3_admit(headers,
-                 local_metadata,
-                 standard_metadata) {
+control l3_admit(inout headers_t headers,
+                 inout local_metadata_t local_metadata,
+                 inout standard_metadata_t standard_metadata) {
     action admit_to_l3() {
         local_metadata.admit_to_l3 = true;
     }
@@ -768,7 +778,6 @@ control acl_ingress(in headers_t headers,
             ttl: ternary;
             ip_protocol: ternary;
             headers.icmp.type: ternary;
-            headers.icmp.type: ternary;
             local_metadata.l4_src_port: ternary;
             local_metadata.l4_dst_port: ternary;
             headers.arp.target_proto_addr: ternary;
@@ -874,15 +883,15 @@ control routing_resolution(in headers_t headers,
                            inout standard_metadata_t standard_metadata) {
     bool tunnel_id_valid = false;
 
-    bit<256> tunnel_id_value = 0;
+    tunnel_id_t tunnel_id_value = 0;
 
     bool router_interface_id_valid = false;
 
-    bit<256> router_interface_id_value = 0;
+    router_interface_id_t router_interface_id_value = 0;
 
     bool neighbor_id_valid = false;
 
-    bit<128> neighbor_id_value = 0;
+    ipv6_addr_t neighbor_id_value = 0;
 
     action_selector(HashAlgorithm.identity,
                     31296,
@@ -1020,9 +1029,9 @@ control routing_resolution(in headers_t headers,
     }
 }
 
-control egress_vlan_checks(headers,
-                           local_metadata,
-                           standard_metadata) {
+control egress_vlan_checks(inout headers_t headers,
+                           inout local_metadata_t local_metadata,
+                           inout standard_metadata_t standard_metadata) {
     bit<9> port = 0;
 
     bool egress_port_is_member_of_vlan = false;
@@ -1089,9 +1098,9 @@ control egress_vlan_checks(headers,
     }
 }
 
-control vlan_tag(headers,
-                 local_metadata,
-                 standard_metadata) {
+control vlan_tag(inout headers_t headers,
+                 inout local_metadata_t local_metadata,
+                 inout standard_metadata_t standard_metadata) {
     apply {
         if (!(local_metadata.vlan_id == NO_VLAN_ID || local_metadata.vlan_id == INTERNAL_VLAN_ID) && !(standard_metadata.instance_type == PKT_INSTANCE_TYPE_EGRESS_CLONE) && !local_metadata.omit_vlan_tag_on_egress_packet) {
             headers.vlan.setValid();
