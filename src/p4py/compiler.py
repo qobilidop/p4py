@@ -616,9 +616,11 @@ def _compile_control(spec) -> ir.ControlDecl:
         # name = p4.table(...) → TableDecl
         elif isinstance(node, ast.Assign) and _is_table_call(node):
             tables.append(_compile_table(node))
-        # name = p4.bit(W) or name = p4.bool_(val) → LocalVarDecl
+        # name = p4.bit(W), p4.bool_(val), or p4.var(type) → LocalVarDecl
         elif isinstance(node, ast.Assign) and (
-            _is_local_var_decl(node) or _is_bool_local_var_decl(node)
+            _is_local_var_decl(node)
+            or _is_bool_local_var_decl(node)
+            or _is_named_type_var_decl(node)
         ):
             local_vars.append(_compile_local_var(node))
         # Already collected in first pass — skip.
@@ -761,8 +763,16 @@ def _is_bool_local_var_decl(node: ast.Assign) -> bool:
     return isinstance(func, ast.Attribute) and func.attr == "bool_"
 
 
+def _is_named_type_var_decl(node: ast.Assign) -> bool:
+    """Check if assignment is name = p4.var(named_type)."""
+    if not isinstance(node.value, ast.Call):
+        return False
+    func = node.value.func
+    return isinstance(func, ast.Attribute) and func.attr == "var"
+
+
 def _compile_local_var(node: ast.Assign) -> ir.LocalVarDecl:
-    """Compile name = p4.bit(W) or name = p4.bool_(val) to LocalVarDecl."""
+    """Compile name = p4.bit(W), p4.bool_(val), or p4.var(type) to LocalVarDecl."""
     name = node.targets[0].id
     func = node.value.func
     if func.attr == "bool_":
@@ -772,6 +782,9 @@ def _compile_local_var(node: ast.Assign) -> ir.LocalVarDecl:
         return ir.LocalVarDecl(
             name=name, type=ir.BoolType(), init_value=ir.BoolLiteral(init_val)
         )
+    if func.attr == "var":
+        type_name = node.value.args[0].id
+        return ir.LocalVarDecl(name=name, type=type_name, init_value=0)
     # Default: p4.bit(W)
     width = node.value.args[0].value
     return ir.LocalVarDecl(name=name, type=ir.BitType(width), init_value=0)
@@ -928,16 +941,27 @@ def _compile_table(node: ast.Assign) -> ir.TableDecl:
 
 
 def _compile_table_keys(dict_node: ast.Dict) -> tuple[ir.TableKey, ...]:
-    """Compile a dict literal {field: match_kind} into TableKeys."""
+    """Compile a dict literal {field: match_kind} into TableKeys.
+
+    Keys may be plain expressions or ("name", expr) tuples for @name annotations.
+    """
     keys = []
     for key_node, val_node in zip(dict_node.keys, dict_node.values, strict=True):
+        name = None
+        if isinstance(key_node, ast.Tuple) and len(key_node.elts) == 2:
+            name_node, expr_node = key_node.elts
+            if isinstance(name_node, ast.Constant) and isinstance(
+                name_node.value, str
+            ):
+                name = name_node.value
+                key_node = expr_node
         field = _ast_to_expression(key_node)
         # p4.exact → "exact"
         if isinstance(val_node, ast.Attribute):
             match_kind = val_node.attr
         else:
             raise ValueError(f"Unsupported match kind: {ast.dump(val_node)}")
-        keys.append(ir.TableKey(field=field, match_kind=match_kind))
+        keys.append(ir.TableKey(field=field, match_kind=match_kind, name=name))
     return tuple(keys)
 
 

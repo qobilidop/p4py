@@ -170,6 +170,52 @@ class TestBoolLocalVarEmit(absltest.TestCase):
         self.assertIn("bit<8> counter = 0;", output)
 
 
+my_id_t = p4.newtype(p4.bit(256), "my_id_t")
+
+
+class TestNamedTypeLocalVar(absltest.TestCase):
+    def test_compile_named_type_var(self):
+        """p4.var(named_type) compiles to LocalVarDecl with named type."""
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            x = p4.var(my_id_t)  # noqa: F841
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        ingress = _get_block(package, "ingress")
+
+        self.assertLen(ingress.local_vars, 1)
+        lv = ingress.local_vars[0]
+        self.assertEqual(lv.name, "x")
+        self.assertEqual(lv.type, "my_id_t")
+        self.assertEqual(lv.init_value, 0)
+
+
+class TestNamedTypeLocalVarEmit(absltest.TestCase):
+    def test_emit_named_type_var(self):
+        """Named type local var emits as 'my_id_t x = 0;'."""
+        from p4py.emitter.p4 import emit
+
+        @p4.control
+        def MyIngress(hdr, meta, std_meta):
+            x = p4.var(my_id_t)  # noqa: F841
+
+        pipeline = V1Switch(
+            parser=_dummy_parser(),
+            ingress=MyIngress,
+            deparser=_dummy_deparser(),
+        )
+        package = compile(pipeline)
+        output = emit(package)
+
+        self.assertIn("my_id_t x = 0;", output)
+
+
 class TestBoolLocalVarSim(absltest.TestCase):
     def test_sim_bool_local_init(self):
         """Bool local vars are initialized correctly in simulation."""

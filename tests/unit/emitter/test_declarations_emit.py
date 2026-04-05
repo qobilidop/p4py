@@ -24,7 +24,10 @@ class TestEmitNewtype(absltest.TestCase):
         nt = ir.NewtypeDecl(name="port_id_t", type=ir.BitType(9))
         lines = []
         _emit_newtype(lines, nt)
-        self.assertEqual(lines, ["type bit<9> port_id_t;"])
+        self.assertEqual(
+            lines,
+            ['@p4runtime_translation("", string)', "type bit<9> port_id_t;"],
+        )
 
 
 class TestEmitEnum(absltest.TestCase):

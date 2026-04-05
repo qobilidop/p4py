@@ -57,6 +57,11 @@ def newtype(underlying: BitType, name: str) -> _NamedType:
     return _NamedType(underlying, name, "newtype")
 
 
+def var(named_type: _NamedType) -> _NamedType:
+    """Declare a zero-initialized local variable of a named type."""
+    return named_type
+
+
 # --- enum ---
 
 
@@ -101,9 +106,13 @@ class _Const:
         return self._p4_name
 
 
-def const(type_ref: _NamedType, value: int, name: str) -> _Const:
+def const(type_ref: _NamedType | BitType, value: int, name: str) -> _Const:
     """Create a P4 const declaration."""
-    return _Const(type_ref._p4_name, value, name)
+    if isinstance(type_ref, BitType):
+        type_name = f"bit<{type_ref.width}>"
+    else:
+        type_name = type_ref._p4_name
+    return _Const(type_name, value, name)
 
 
 # --- header ---

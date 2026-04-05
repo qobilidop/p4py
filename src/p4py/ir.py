@@ -348,6 +348,7 @@ class ActionDecl:
 class TableKey:
     field: Expression  # Field path, isValid(), literal, or expression (e.g., LogicalOp)
     match_kind: str
+    name: str | None = None  # @name annotation for complex key expressions
 
 
 @dataclass(frozen=True)
