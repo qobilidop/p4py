@@ -64,7 +64,7 @@ class TestPartialActionCompile(absltest.TestCase):
             ):
                 pass
 
-            my_table = p4.table(
+            my_table = p4.table(  # noqa: F841
                 key={hdr.ethernet.dstAddr: p4.exact},
                 actions=[drop, set_nexthop_id(meta)],
                 default_action=drop,

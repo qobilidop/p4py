@@ -120,7 +120,7 @@ class TestActionSelectorCompile(absltest.TestCase):
                 v1model.HashAlgorithm.identity, 31296, 16
             )
 
-            my_table = p4.table(
+            my_table = p4.table(  # noqa: F841
                 key={
                     hdr.ethernet.dstAddr: p4.exact,
                     hdr.ethernet.srcAddr: p4.selector,

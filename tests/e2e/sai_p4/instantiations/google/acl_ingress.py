@@ -34,12 +34,12 @@ def acl_ingress(
     # Cancels out local_metadata.marked_to_copy when true.
     cancel_copy = p4.bool_(False)
 
-    acl_ingress_meter = v1model.direct_meter(MeterColor_t, "bytes")
+    acl_ingress_meter = v1model.direct_meter(MeterColor_t, "bytes")  # noqa: F841
     acl_ingress_qos_meter = v1model.direct_meter(MeterColor_t, "bytes")
     acl_ingress_counter = v1model.direct_counter("packets_and_bytes")
     acl_ingress_qos_counter = v1model.direct_counter("packets_and_bytes")
     acl_ingress_counting_counter = v1model.direct_counter("packets_and_bytes")
-    acl_ingress_security_counter = v1model.direct_counter("packets_and_bytes")
+    acl_ingress_security_counter = v1model.direct_counter("packets_and_bytes")  # noqa: F841
 
     # -- Actions --
 
@@ -175,7 +175,6 @@ def acl_ingress(
             ttl: p4.ternary,
             ip_protocol: p4.ternary,
             headers.icmp.type: p4.ternary,
-            headers.icmp.type: p4.ternary,
             local_metadata.l4_src_port: p4.ternary,
             local_metadata.l4_dst_port: p4.ternary,
             headers.arp.target_proto_addr: p4.ternary,
@@ -265,8 +264,8 @@ def acl_ingress(
         ip_protocol = headers.ipv4.protocol
     elif headers.ipv6.isValid():
         ttl = headers.ipv6.hop_limit
-        dscp = headers.ipv6.dscp
-        ecn = headers.ipv6.ecn
+        dscp = headers.ipv6.dscp  # noqa: F841
+        ecn = headers.ipv6.ecn  # noqa: F841
         ip_protocol = headers.ipv6.next_header
 
     # TOR table application order

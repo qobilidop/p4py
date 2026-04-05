@@ -3,13 +3,13 @@
 import p4py.lang as p4
 from p4py.arch import v1model
 from p4py.arch.v1model import standard_metadata_t
+from tests.e2e.sai_p4.fixed.headers import vlan_id_t
 from tests.e2e.sai_p4.fixed.metadata import (
     acl_metadata_t,
     headers_t,
     local_metadata_t,
     vrf_id_t,
 )
-from tests.e2e.sai_p4.fixed.headers import vlan_id_t
 
 
 @p4.control

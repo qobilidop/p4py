@@ -14,13 +14,6 @@ from tests.e2e.sai_p4.fixed.headers import (
     vlan_id_t,
 )
 from tests.e2e.sai_p4.fixed.l3_admit import admit_google_system_mac, l3_admit
-from tests.e2e.sai_p4.fixed.routing import (
-    routing_lookup,
-    routing_resolution,
-    set_nexthop_id,
-)
-from tests.e2e.sai_p4.instantiations.google.acl_ingress import acl_ingress
-from tests.e2e.sai_p4.instantiations.google.acl_pre_ingress import acl_pre_ingress
 from tests.e2e.sai_p4.fixed.metadata import (
     MeterColor_t,
     PreservedFieldList,
@@ -43,12 +36,19 @@ from tests.e2e.sai_p4.fixed.metadata import (
     wcmp_group_id_t,
 )
 from tests.e2e.sai_p4.fixed.packet_io import packet_out_decap
+from tests.e2e.sai_p4.fixed.routing import (
+    routing_lookup,
+    routing_resolution,
+    set_nexthop_id,
+)
 from tests.e2e.sai_p4.fixed.vlan import (
     egress_vlan_checks,
     ingress_vlan_checks,
     vlan_tag,
     vlan_untag,
 )
+from tests.e2e.sai_p4.instantiations.google.acl_ingress import acl_ingress
+from tests.e2e.sai_p4.instantiations.google.acl_pre_ingress import acl_pre_ingress
 
 
 @p4.parser

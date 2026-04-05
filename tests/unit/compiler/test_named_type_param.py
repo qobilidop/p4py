@@ -8,7 +8,6 @@ from p4py.arch.v1model import V1Switch
 from p4py.compiler import compile
 from p4py.emitter.p4 import _emit_action
 
-
 # --- Type fixtures ---
 
 vrf_id_t = p4.typedef(p4.bit(10), "vrf_id_t")

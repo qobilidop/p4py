@@ -29,7 +29,6 @@ from tests.e2e.sai_p4.fixed.metadata import (
     wcmp_group_id_t,
 )
 
-
 # --- File-scope action (shared between routing_lookup and routing_resolution) ---
 
 
@@ -148,7 +147,7 @@ def routing_lookup(
         # IS_MULTICAST_IPV4(headers.ipv4.dst_addr)
         if (headers.ipv4.dst_addr & 0xF0000000) == 0xE0000000:
             # IS_IPV4_MULTICAST_MAC(headers.ethernet.dst_addr)
-            if (headers.ethernet.dst_addr[47:24] == 0x01005E) and (
+            if (headers.ethernet.dst_addr[47:24] == 0x01005E) and (  # noqa: SIM102
                 headers.ethernet.dst_addr[23:23] == 0
             ):
                 if not local_metadata.marked_to_drop_by_ingress_vlan_checks:
@@ -165,7 +164,7 @@ def routing_lookup(
             headers.ipv6.dst_addr & 0xFF000000000000000000000000000000
         ) == 0xFF000000000000000000000000000000:
             # IS_IPV6_MULTICAST_MAC(headers.ethernet.dst_addr)
-            if headers.ethernet.dst_addr[47:32] == 0x3333:
+            if headers.ethernet.dst_addr[47:32] == 0x3333:  # noqa: SIM102
                 if not local_metadata.marked_to_drop_by_ingress_vlan_checks:
                     local_metadata.route_hit = ipv6_multicast_table.apply().hit
         else:
@@ -186,13 +185,13 @@ def routing_resolution(
 ):
     # Control-local variables.
     tunnel_id_valid = p4.bool_(False)
-    tunnel_id_value = p4.bit(256)
+    tunnel_id_value = p4.var(tunnel_id_t)
 
     router_interface_id_valid = p4.bool_(False)
-    router_interface_id_value = p4.bit(256)
+    router_interface_id_value = p4.var(router_interface_id_t)
 
     neighbor_id_valid = p4.bool_(False)
-    neighbor_id_value = p4.bit(128)  # ipv6_addr_t width
+    neighbor_id_value = p4.var(ipv6_addr_t)
 
     # --- Actions ---
 
@@ -225,10 +224,10 @@ def routing_resolution(
         disable_dst_mac_rewrite: p4.bit(1),
         disable_vlan_rewrite: p4.bit(1),
     ):
-        router_interface_id_valid = True
-        router_interface_id_value = router_interface_id
-        neighbor_id_valid = True
-        neighbor_id_value = neighbor_id
+        router_interface_id_valid = True  # noqa: F841
+        router_interface_id_value = router_interface_id  # noqa: F841
+        neighbor_id_valid = True  # noqa: F841
+        neighbor_id_value = neighbor_id  # noqa: F841
         local_metadata.enable_decrement_ttl = not p4.cast(p4.bool, disable_decrement_ttl)
         local_metadata.enable_src_mac_rewrite = not p4.cast(p4.bool, disable_src_mac_rewrite)
         local_metadata.enable_dst_mac_rewrite = not p4.cast(p4.bool, disable_dst_mac_rewrite)
@@ -245,8 +244,8 @@ def routing_resolution(
 
     @p4.action
     def set_p2p_tunnel_encap_nexthop(tunnel_id: tunnel_id_t):
-        tunnel_id_valid = True
-        tunnel_id_value = tunnel_id
+        tunnel_id_valid = True  # noqa: F841
+        tunnel_id_value = tunnel_id  # noqa: F841
 
     @p4.action
     def mark_for_p2p_tunnel_encap(

@@ -8,7 +8,6 @@ from p4py.arch.v1model import V1Switch
 from p4py.compiler import compile
 from p4py.emitter.p4 import _emit_action
 
-
 local_metadata_t = p4.newtype(p4.bit(8), "local_metadata_t")
 nexthop_id_t = p4.newtype(p4.bit(16), "nexthop_id_t")
 
