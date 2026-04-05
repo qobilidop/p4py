@@ -2,16 +2,22 @@
 
 import p4py.lang as p4
 from p4py.arch import v1model
+from p4py.arch.v1model import standard_metadata_t
 from tests.e2e.sai_p4.fixed.headers import INTERNAL_VLAN_ID, NO_VLAN_ID
 from tests.e2e.sai_p4.fixed.ids import (
     ETHERTYPE_8021Q,
     PKT_INSTANCE_TYPE_EGRESS_CLONE,
     PKT_INSTANCE_TYPE_INGRESS_CLONE,
 )
+from tests.e2e.sai_p4.fixed.metadata import headers_t, local_metadata_t
 
 
 @p4.control
-def vlan_untag(headers, local_metadata, standard_metadata):
+def vlan_untag(
+    headers: p4.inout(headers_t),
+    local_metadata: p4.inout(local_metadata_t),
+    standard_metadata: p4.inout(standard_metadata_t),
+):
     @p4.action
     def disable_vlan_checks():
         local_metadata.enable_vlan_checks = False
@@ -35,7 +41,11 @@ def vlan_untag(headers, local_metadata, standard_metadata):
 
 
 @p4.control
-def ingress_vlan_checks(headers, local_metadata, standard_metadata):
+def ingress_vlan_checks(
+    headers: p4.inout(headers_t),
+    local_metadata: p4.inout(local_metadata_t),
+    standard_metadata: p4.inout(standard_metadata_t),
+):
     enable_ingress_vlan_checks = p4.bool_(True)
     ingress_port_is_member_of_vlan = p4.bool_(False)
 
@@ -64,7 +74,11 @@ def ingress_vlan_checks(headers, local_metadata, standard_metadata):
 
 
 @p4.control
-def egress_vlan_checks(headers, local_metadata, standard_metadata):
+def egress_vlan_checks(
+    headers: p4.inout(headers_t),
+    local_metadata: p4.inout(local_metadata_t),
+    standard_metadata: p4.inout(standard_metadata_t),
+):
     port = p4.bit(9)
     egress_port_is_member_of_vlan = p4.bool_(False)
     enable_egress_vlan_checks = p4.bool_(True)
@@ -125,7 +139,11 @@ def egress_vlan_checks(headers, local_metadata, standard_metadata):
 
 
 @p4.control
-def vlan_tag(headers, local_metadata, standard_metadata):
+def vlan_tag(
+    headers: p4.inout(headers_t),
+    local_metadata: p4.inout(local_metadata_t),
+    standard_metadata: p4.inout(standard_metadata_t),
+):
     if (
         not (
             local_metadata.vlan_id == NO_VLAN_ID
